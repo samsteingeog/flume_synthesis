@@ -1,0 +1,111 @@
+---
+title: "Creating Function"
+author: "Sam Stein"
+date: "11/19/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+
+#setWD
+setwd("~/flume_synthesis")
+
+```
+
+```{r data import, include=TRUE, warning=FALSE}
+
+#import tester data
+flume_data_test <- read_csv("data/flume_data_test.csv") 
+data <- flume_data_test[1:23] %>%
+  filter(Paper == 'Wu_2011')
+
+#Aggregate variables until each exponent has one associated variable
+
+#k value = first term c5
+
+findK <- function(Re_s, #collector Reynolds number
+                  a, #front area per unit volume
+                  h, #collector height
+                  d #collector diameter 
+                  ){
+  
+  k <- Re_s/((sqrt(a*h))*(1-(a*d)))
+
+  return(k)
+}
+
+#j value = third term c7
+
+findJ <- function(a, #frontal area per unit volume
+                  d #collector diameter
+){
+  
+  j <- a*d
+  
+  return(j)
+}
+
+#P value = ratio of particle density to water density
+#assuming 1 g/cm^3 density of water
+
+findP <- function(part_dense #particle density in g/cm^3
+){
+  
+  P <- part_dense/1
+  
+  return(P)
+}
+
+#calculate aggregate terms
+
+data <- data %>%
+  mutate(k = findK(Re_s = Re_c, a = frontal_area_unit_volume, h = height, d = d_c)) %>%
+  mutate(j = findJ(a = frontal_area_unit_volume, d = d_c)) %>%
+  mutate(P = findP(part_dense = particle_density))
+
+
+#log terms for later linear model fit
+
+data <- data %>%
+  mutate(logX1 = log(k)) %>%
+  mutate(logX2 = log(R_star)) %>%
+  mutate(logX3 = log(j)) %>%
+  mutate(logX4 = log(P)) %>%
+  mutate(logY = log(n_0))
+
+
+#Write cleaned data file
+subdata <- data %>%
+  select(c("run_ID", "Paper", "n_0", "Re_c", "frontal_area_unit_volume", "height", "d_c", "R_star", "P", "logY", "logX1", "logX2", "logX3", "logX4"))
+  
+write.csv(subdata, file = "flume_tester_data.csv")
+
+```
+
+```{r fit linear function, include=TRUE}
+
+#Fit linear model
+y_hat <- data$logY
+logX1 <- data$logX1
+logX2 <- data$logX2
+logX3 <- data$logX3
+logX4 <- data$logX4
+
+linear_mod <- lm(y_hat ~ logX1 + logX2 + logX3 + logX4)
+
+plot(linear_mod)
+
+```
+
+```{r check linear function fit, include=TRUE}
+
+
+
+
+
+
+
+```
