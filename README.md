@@ -19,7 +19,7 @@ This code calls the following variables:
 | Collector Diameter | *d* | cm
 | Particle - Collector Radius Ratio | R* | N/A
 | Particle - Water Density Ratio | P | N/A
-| Contact Efficiency | eta_not (*n*_0)  | N/A
+| Capture Efficiency | eta (*n*)  | N/A
 
 The repo contains the following files: 
 
