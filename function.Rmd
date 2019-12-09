@@ -9,6 +9,10 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
+library(GGally)
+library(ggpubr)
+library(boot)
+library(kableExtra)
 
 #setWD
 setwd("~/flume_synthesis")
@@ -20,6 +24,17 @@ setwd("~/flume_synthesis")
 #import data
 #flume_data_test <- read_csv("data/flume_data_test.csv") 
 data <- read_excel("data/flume_review_data_eta.xlsx")
+
+#importing function to display eqn and R2 values
+
+lm_eqn <- function(df){
+    m <- lm(y ~ x, df);
+    eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+         list(a = format(unname(coef(m)[1]), digits = 2),
+              b = format(unname(coef(m)[2]), digits = 2),
+             r2 = format(summary(m)$r.squared, digits = 3)))
+    as.character(as.expression(eq));
+}
 
 ```
 
@@ -133,8 +148,9 @@ small_Re_lm <- findLogFit(logdata = small_Re)
 large_Re_lm <- findLogFit(logdata = large_Re)
 biofilm_lm <- findLogFit(logdata = biofilm)
 
-#plot(linear_mod)
-
+#pulling out R2 values for plotting bootstrap CI later
+total_R2 <- summary(total_lm)$r.square 
+bio_R2 <- summary(biofilm_lm)$r.square
 ```
 
 ```{r check linear function fit, include=TRUE}
@@ -143,37 +159,242 @@ biofilm_lm <- findLogFit(logdata = biofilm)
 
 logdata$predlogeta <- predict(total_lm)
 
-ggplot(logdata) + geom_point(aes(x = logY, y = predlogeta)) + #Display regression
- theme_minimal() 
+all <- ggplot(logdata, aes(x = logY, y = predlogeta)) + 
+  geom_smooth(method = "lm", color = "black") +
+   # stat_poly_eq(formula = my.formula, 
+   #              aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
+   #              parse = TRUE) +
+  geom_point(color = "darkblue", shape = 8, size = 1.5, alpha = .8) +
+  theme_minimal() + 
+  labs(title = "All Runs (R2 = 0.8914)", y = "predicted log(capture efficiency)", x = "")
 
 #Predict for Re regimes
 
 small_Re$predlogeta <- predict(small_Re_lm)
 
-ggplot(small_Re) + geom_point(aes(x = logY, y = predlogeta)) + #Display regression
- theme_minimal()
+small <- ggplot(small_Re, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
+  geom_point(color = "darkblue", shape = 8, size = 1.5, alpha = .8) +
+  theme_minimal() + 
+  labs(title = "Re < 40 (R2 = 0.9889)", x = "observed log(capture efficiency)", y = "predicted log(capture efficiency)")
 
 large_Re$predlogeta <- predict(large_Re_lm)
 
-ggplot(large_Re) + geom_point(aes(x = logY, y = predlogeta)) + #Display regression
- theme_minimal()
+large <- ggplot(large_Re, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
+  geom_point(color = "darkblue", shape = 8, size = 1.5, alpha = .8) +
+  theme_minimal() + 
+  labs(title = "Re >40 (R2 = 0.8822)", x = "observed log(capture efficiency)", y = "")
 
 #Predict for runs with biofilm presence 
 
 biofilm$predlogeta <- predict(biofilm_lm)
 
-ggplot(biofilm) + geom_point(aes(x = logY, y = predlogeta)) + #Display regression
- theme_minimal()
+bio <- ggplot(biofilm, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
+  geom_point(color = "darkblue", shape = 8, size = 1.5, alpha = .8) +
+  theme_minimal() + 
+  labs(title = "Biofilm present (R2 = 0.9039)", x = "", y = "")
+
+
+png("prelimplots.png")
+
+ggarrange(all, bio, small, large, ncol = 2, nrow = 2)
+
+dev.off()
+```
+
+```{r bootstrap R2, include=TRUE}
+
+#Set up modified logfit function to return R2
+
+bootFitR2 <- function(formula, logdata, indices){
+  
+  d <- logdata[indices,] # allows boot to select samples
+  
+  fit <- lm(formula, data=d)
+ 
+  return(summary(fit)$r.square)  #returns R2 in vector(?) form
+
+}
+
+#set up bootstrap to return R2 value using 10000 bootstraps
+
+all_R2 <- boot(data = logdata, statistic = bootFitR2,  #all data
+   R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
+
+biofilm_R2 <- boot(data = biofilm, statistic = bootFitR2,  #runs with biofilm
+   R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
+
+
+#Get 95% confidence intervals of bootstrapped results
+
+all_R2_ci <- boot.ci(all_R2, conf = 0.95, type = "norm")
+all_R2_min <- all_R2_ci$normal[2]
+all_R2_max <- all_R2_ci$normal[3]
+
+biofilm_R2_ci <- boot.ci(biofilm_R2, conf = 0.95, type = "norm")
+biofilm_R2_min <- biofilm_R2_ci$normal[2]
+biofilm_R2_max <- biofilm_R2_ci$normal[3]
+
+#plot R2 values
+
+all_R2_plot <- all_R2$t #extract just R2 values for all data
+all_R2_plot <- as.data.frame(all_R2_plot)
+
+biofilm_R2_plot <- biofilm_R2$t #extract just R2 values for all data
+biofilm_R2_plot <- as.data.frame(biofilm_R2_plot)
+
+
+ggplot(all_R2_plot) + geom_histogram(aes(x = V1), color = "lightgrey", alpha = 0.9) +
+  geom_vline(aes(xintercept = all_R2_min), col="blue") +   
+  geom_vline(aes(xintercept = all_R2_max), col="blue") +
+  geom_vline(aes(xintercept = total_R2), col="green") +
+  theme_minimal() +
+  labs(title = "Bootstrapped Goodness of Fit for All Data", x = "R2 values", y = "Count (10000 total)") 
+
+ggplot(biofilm_R2_plot) + geom_histogram(aes(x = V1), color="lightgrey", alpha = 0.9) +
+  geom_vline(aes(xintercept = biofilm_R2_min), color = "blue") + 
+  geom_vline(aes(xintercept = biofilm_R2_max), color = "blue") +
+  geom_vline(aes(xintercept = bio_R2), col="green") +
+  theme_minimal() +
+  labs(title = "Bootstrapped Goodness of Fit for Runs with Biofilm", x = "R2 values", y = "Count (10000 total)")
+
+```
+
+```{r bootstrap coef, include=TRUE}
+
+#Set up modified logfit function to return coefficients
+
+bootFitCoef <- function(formula, logdata, indices){
+  
+  d <- logdata[indices,] # allows boot to select samples
+  
+  fit <- lm(formula, data=d)
+ 
+  return(coef(fit))  #returns ceofficients in vector(?) form
+
+}
+
+#set up bootstrap to return coef values using 10000 bootstraps
+
+all_coef <- boot(data = logdata, statistic = bootFitCoef,  #all data
+   R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
+
+biofilm_coef <- boot(data = biofilm, statistic = bootFitCoef,  #runs with biofilm
+   R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
+
+
+#95% confidence interval of bootstraps
+
+all_coef_int <- boot.ci(all_coef, coef = 0.95, type = "bca", index = 1) #intersect
+all_coef_C1 <- boot.ci(all_coef, coef = 0.95, type = "bca", index = 2) #C1
+all_coef_C2 <- boot.ci(all_coef, coef = 0.95, type = "bca", index = 3) #C2
+all_coef_C3 <- boot.ci(all_coef, coef = 0.95, type = "bca", index = 4) #C3
+all_coef_C4 <- boot.ci(all_coef, coef = 0.95, type = "bca", index = 5) #C4
+
+biofilm_coef_int <- boot.ci(biofilm_coef, coef = 0.95, type = "bca", index = 1) #intersect
+biofilm_coef_C1 <- boot.ci(biofilm_coef, coef = 0.95, type = "bca", index = 2) #C1
+biofilm_coef_C2 <- boot.ci(biofilm_coef, coef = 0.95, type = "bca", index = 3) #C2
+biofilm_coef_C3 <- boot.ci(biofilm_coef, coef = 0.95, type = "bca", index = 4) #C3
+biofilm_coef_C4 <- boot.ci(biofilm_coef, coef = 0.95, type = "bca", index = 5) #C4
+
+#Extract CI values 
+
+all_intersect <- all_coef_int$bca[4:5] #4 = min, 5 = max
+all_c1 <- all_coef_C1$bca[4:5]
+all_c2 <- all_coef_C2$bca[4:5]
+all_c3 <- all_coef_C3$bca[4:5]
+all_c4 <- all_coef_C4$bca[4:5]
+all_CI <- rbind(all_intersect, all_c1, all_c2, all_c3, all_c4)
+all_CI <- as.data.frame(all_CI)
+
+biofilm_intersect <- biofilm_coef_int$bca[4:5]
+biofilm_c1 <- biofilm_coef_C1$bca[4:5]
+biofilm_c2 <- biofilm_coef_C2$bca[4:5]
+biofilm_c3 <- biofilm_coef_C3$bca[4:5]
+biofilm_c4 <- biofilm_coef_C4$bca[4:5]
+biofilm_CI <- rbind(biofilm_intersect, biofilm_c1, biofilm_c2, biofilm_c3, biofilm_c4)
+biofilm_CI <- as.data.frame(biofilm_CI)
+
+#Vectors of min and max coefs
+min_all <- all_CI$V1
+max_all <- all_CI$V2
+
+min_biofilm <- biofilm_CI$V1
+max_biofilm <- biofilm_CI$V2
+
+#Vectors of fitted model coefs
+fit_all <- total_lm$coefficients
+fit_biofilm <- biofilm_lm$coefficients
+
+#Table with 95% CI min/max results and fitted models
+
+table_all_fit <- rbind(min_all, fit_all, max_all) 
+table_all_fit <- as.data.frame(table_all_fit) 
+table_all_fit <-  table_all_fit %>%
+  select(Intercept = '(Intercept)',
+         C1  = logX1,
+         C2 = logX2,
+         C3 = logX3,
+         C4 = logX4)
+row.names(table_all_fit) <- c("Min", "Fit", "Max")
+
+table_biofilm_fit <- rbind(min_biofilm, fit_biofilm, max_biofilm) 
+table_biofilm_fit <- as.data.frame(table_biofilm_fit) 
+table_biofilm_fit <-  table_biofilm_fit %>%
+  select(Intercept = '(Intercept)',
+         C1  = logX1,
+         C2 = logX2,
+         C3 = logX3,
+         C4 = logX4)
+row.names(table_biofilm_fit) <- c("Min", "Fit", "Max")
 
 ```
 
 
+```{r plots with CI, include = FALSE,eval=FALS}
 
-```{r export clean dataset, include=TRUE}
+plotCI <- function(data, CI){
+  
+  logY <- CI[1] + (CI[2]*data$logX1) + (CI[3]*data$logX2) + (CI[4]*data$logX3) + (CI[5]*data$logX4)
+  
+  return(logY)
+}
+
+
+min_all_fun <- plotCI(logdata, min_all)
+
+all_coef_plot <- all_coef$t #extract just coefs values for all data
+all_coef_plot <- as.data.frame(all_coef_plot) %>%  
+  select(Intercept = V1,
+         C1  = V2,
+         C2 = V3,
+         C3 = V4,
+         C4 = V5)
+
+biofilm_coef_plot <- biofilm_coef$t #extract just coefs values for all data
+biofilm_coef_plot <- as.data.frame(biofilm_coef_plot) %>%  
+  select(Intercept = V1,
+         C1  = V2,
+         C2 = V3,
+         C3 = V4,
+         C4 = V5)
+
+
+ggplot(all_coef_plot) + geom_histogram(aes(x = Intercept)) +
+  theme_minimal() +
+  labs(title = "Bootstrapped Goodness of Fit for All Data", x = "R^2 values", y = "Count (10000 total)")
+
+ggplot(biofilm_coef_plot) + geom_histogram(aes(x = C1)) +
+  theme_minimal() +
+  labs(title = "Bootstrapped Goodness of Fit for Runs with Biofilm", x = "R^2 values", y = "Count (10000 total)")
+
+```
+
+
+```{r export clean dataset, include=TRUE,eval=FALSE}
 
 #Write cleaned data file
 cleandata <- logdata %>%
-  select(c("run_ID", "paper", "eta", "Re_c", "frontal_area_unit_volume", "height", "d_c", "radius_ratio", "P", "logY", "logX1", "logX2", "logX3", "logX4"))
+  select(c("run_ID", "paper", "eta", "Re_c", "frontal_area_unit_volume", "height", "d_c", "radius_ratio", "P", "logY", "logX1", "logX2", "logX3", "logX4", "predlogeta"))
   
 #write.csv(subdata, file = "flume_tester_data.csv")
 
