@@ -17,10 +17,26 @@ setwd("~/flume_synthesis")
 
 ```{r data import, include=TRUE, warning=FALSE}
 
-#import tester data
-flume_data_test <- read_csv("data/flume_data_test.csv") 
-data <- flume_data_test[1:23] %>%
-  filter(Paper == 'Wu_2011')
+#import data
+#flume_data_test <- read_csv("data/flume_data_test.csv") 
+data <- read_excel("data/flume_review_data_eta.xlsx")
+
+```
+
+
+```{r data cleaning, include=TRUE, warning=FALSE}
+
+data <- data %>%
+  filter(!(is.na(eta))) #only include runs with eta values
+
+#Convert from character to numeric
+data$Re_c <- as.numeric(data$Re_c)
+data$height <- as.numeric(data$height)
+  
+```
+
+
+```{r aggregate and log terms, include=TRUE, warning=FALSE}
 
 #Aggregate variables until each exponent has one associated variable
 
@@ -69,43 +85,96 @@ data <- data %>%
 
 #log terms for later linear model fit
 
-data <- data %>%
+logdata <- data %>%
   mutate(logX1 = log(k)) %>%
-  mutate(logX2 = log(R_star)) %>%
+  mutate(logX2 = log(radius_ratio)) %>%
   mutate(logX3 = log(j)) %>%
   mutate(logX4 = log(P)) %>%
-  mutate(logY = log(n_0))
+  mutate(logY = log(eta))
 
+#Split into Re regime
+small_Re <- logdata %>%
+  filter(Re_c <= 40)
 
-#Write cleaned data file
-subdata <- data %>%
-  select(c("run_ID", "Paper", "n_0", "Re_c", "frontal_area_unit_volume", "height", "d_c", "R_star", "P", "logY", "logX1", "logX2", "logX3", "logX4"))
-  
-write.csv(subdata, file = "flume_tester_data.csv")
+large_Re <- logdata %>%
+  filter(Re_c > 40)
+
+#Isolate just biofilm runs
+biofilm <- logdata %>%
+  filter(biofilm == "yes")
 
 ```
 
 ```{r fit linear function, include=TRUE}
 
-#Fit linear model
-y_hat <- data$logY
-logX1 <- data$logX1
-logX2 <- data$logX2
-logX3 <- data$logX3
-logX4 <- data$logX4
+#Write function to find linear fit
 
-linear_mod <- lm(y_hat ~ logX1 + logX2 + logX3 + logX4)
+findLogFit <- function(logdata){
 
-plot(linear_mod)
+  #Fit linear model to entire set
+  #input dataset MUST have these same variable names
+  
+  y_hat <- logdata$logY
+  logX1 <- logdata$logX1
+  logX2 <- logdata$logX2
+  logX3 <- logdata$logX3
+  logX4 <- logdata$logX4
+
+  linear_mod <- lm(y_hat ~ logX1 + logX2 + logX3 + logX4)
+
+  return(linear_mod)
+
+}
+
+#Return linear model for entire dataset
+
+total_lm <- findLogFit(logdata = logdata)
+small_Re_lm <- findLogFit(logdata = small_Re)
+large_Re_lm <- findLogFit(logdata = large_Re)
+biofilm_lm <- findLogFit(logdata = biofilm)
+
+#plot(linear_mod)
 
 ```
 
 ```{r check linear function fit, include=TRUE}
 
+#Predict values for entire data set
+
+logdata$predlogeta <- predict(total_lm)
+
+ggplot(logdata) + geom_point(aes(x = logY, y = predlogeta)) + #Display regression
+ theme_minimal() 
+
+#Predict for Re regimes
+
+small_Re$predlogeta <- predict(small_Re_lm)
+
+ggplot(small_Re) + geom_point(aes(x = logY, y = predlogeta)) + #Display regression
+ theme_minimal()
+
+large_Re$predlogeta <- predict(large_Re_lm)
+
+ggplot(large_Re) + geom_point(aes(x = logY, y = predlogeta)) + #Display regression
+ theme_minimal()
+
+#Predict for runs with biofilm presence 
+
+biofilm$predlogeta <- predict(biofilm_lm)
+
+ggplot(biofilm) + geom_point(aes(x = logY, y = predlogeta)) + #Display regression
+ theme_minimal()
+
+```
 
 
 
+```{r export clean dataset, include=TRUE}
 
-
+#Write cleaned data file
+cleandata <- logdata %>%
+  select(c("run_ID", "paper", "eta", "Re_c", "frontal_area_unit_volume", "height", "d_c", "radius_ratio", "P", "logY", "logX1", "logX2", "logX3", "logX4"))
+  
+#write.csv(subdata, file = "flume_tester_data.csv")
 
 ```

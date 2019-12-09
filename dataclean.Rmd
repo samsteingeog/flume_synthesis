@@ -6,9 +6,9 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-#knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE)
 
-#library(tidyverse)
+library(tidyverse)
 
 #setWD
 setwd("~/flume_synthesis")
@@ -17,30 +17,302 @@ setwd("~/flume_synthesis")
 
 ```{r Fauria Particle Concentration, include=TRUE, warning=FALSE}
 
-#import tester data
-highSPC <- read_csv("data/Plants_22a_09262012.asc") 
+# #Plot to confirm that it matches SPC in Fauria 2014 paper Fig 2
+# #Shape is the same (compressed since plotting by bin number and not particle size)
+# 
+# ggplot(highSPClong) + geom_point(aes(x = bin, y = value))
+# ggplot(lowSPClong) + geom_point(aes(x = bin, y = value))
 
-lowSPC <- read_csv("data/Plants_19b_092652012.asc")  
+#import example data sets
 
-data <- flume_data_test[1:23] %>%
-  filter(Paper == 'Wu_2011')
+SPC7a <- read.table("~/flume_synthesis/data/Control_7a_09182012_K117.txt", quote="\"", comment.char="") #reading in LISST particle concentration for each bin
+SPC7b <- read.table("~/flume_synthesis/data/Control_7b_09182012_K117.txt", quote="\"", comment.char="") 
+SPC8a <- read.table("~/flume_synthesis/data/Plants_8a_09192012_K117.txt", quote="\"", comment.char="") 
+SPC8b <- read.table("~/flume_synthesis/data/Plants_8b_09192012_K117.txt", quote="\"", comment.char="") 
+SPC9a <- read.table("~/flume_synthesis/data/Plants_9a_09202012_K117.txt", quote="\"", comment.char="") 
+SPC9b <- read.table("~/flume_synthesis/data/Plants_9b_09202012_K117.txt", quote="\"", comment.char="") 
+SPC16a <- read.table("~/flume_synthesis/data/Plants_16a_09242012_K117.txt", quote="\"", comment.char="") 
+SPC16b <- read.table("~/flume_synthesis/data/Plants_16b_09242012_K117.txt", quote="\"", comment.char="") 
+SPC17a <- read.table("~/flume_synthesis/data/Plants_17a_09242012_K117.txt", quote="\"", comment.char="") 
+SPC17b <- read.table("~/flume_synthesis/data/Plants_17b_09242012_K117.txt", quote="\"", comment.char="") 
+SPC18a <- read.table("~/flume_synthesis/data/Plants_18a_09242012_K117.txt", quote="\"", comment.char="") 
+SPC18b <- read.table("~/flume_synthesis/data/Plants_18b_09242012_K117.txt", quote="\"", comment.char="") 
 
+fauria_eta <- read_excel("data/flume_review_data_eta.xlsx", sheet = "Fauria_eta", col_names = FALSE) #reading in eta values for each bin
 
+#bin <- 1:32
+
+#7a
+#select first observation of each of the 32 particle size bins
+SPC7a <- SPC7a[1:32] %>%
+  head(1) %>%
+  gather()
+ 
+#Select final eta values for each bin for the correct run
+eta7a <- fauria_eta %>%
+  filter(...1 == "7a") %>%
+  gather() %>%
+  slice(-1) %>%
+  mutate(eta = value) %>%
+  select(-c(value, key))
+
+eta7a$eta <- as.double(eta7a$eta) #set to a numeric
+
+SPC7a <- SPC7a %>% #mulitple eta values by weight and find final sum
+  cbind(eta7a) %>%
+  mutate(weightedN = eta*value)
+
+eta7aFinal <- sum(SPC7a$weightedN)
+
+#7b
+#select first observation of each of the 32 particle size bins
+SPC7b <- SPC7b[1:32] %>%
+  head(1) %>%
+  gather()
+ 
+#Select final eta values for each bin for the correct run
+eta7b <- fauria_eta %>%
+  filter(...1 == "7b") %>%
+  gather() %>%
+  slice(-1) %>%
+  mutate(eta = value) %>%
+  select(-c(value, key))
+
+eta7b$eta <- as.double(eta7b$eta) #set to a numeric
+
+SPC7b <- SPC7b %>% #mulitple eta values by weight and find final sum
+  cbind(eta7b) %>%
+  mutate(weightedN = eta*value)
+
+eta7bFinal <- sum(SPC7b$weightedN)
+
+#8a
+#select first observation of each of the 32 particle size bins
+SPC8a <- SPC8a[1:32] %>%
+  head(1) %>%
+  gather()
+ 
+#Select final eta values for each bin for the correct run
+eta8a <- fauria_eta %>%
+  filter(...1 == "8a") %>%
+  gather() %>%
+  slice(-1) %>%
+  mutate(eta = value) %>%
+  select(-c(value, key))
+
+eta8a$eta <- as.double(eta8a$eta) #set to a numeric
+
+SPC8a <- SPC8a %>% #mulitple eta values by weight and find final sum
+  cbind(eta8a) %>%
+  mutate(weightedN = eta*value)
+
+eta8aFinal <- sum(SPC8a$weightedN)
+
+#8b
+#select first observation of each of the 32 particle size bins
+SPC8b <- SPC8b[1:32] %>%
+  head(1) %>%
+  gather()
+ 
+#Select final eta values for each bin for the correct run
+eta8b <- fauria_eta %>%
+  filter(...1 == "8b") %>%
+  gather() %>%
+  slice(-1) %>%
+  mutate(eta = value) %>%
+  select(-c(value, key))
+
+eta8b$eta <- as.double(eta8b$eta) #set to a numeric
+
+SPC8b <- SPC8b %>% #mulitple eta values by weight and find final sum
+  cbind(eta8b) %>%
+  mutate(weightedN = eta*value)
+
+eta8bFinal <- sum(SPC8b$weightedN)
+
+#9a
+#select first observation of each of the 32 particle size bins
+SPC9a <- SPC9a[1:32] %>%
+  head(1) %>%
+  gather()
+ 
+#Select final eta values for each bin for the correct run
+eta9a <- fauria_eta %>%
+  filter(...1 == "9a") %>%
+  gather() %>%
+  slice(-1) %>%
+  mutate(eta = value) %>%
+  select(-c(value, key))
+
+eta9a$eta <- as.double(eta9a$eta) #set to a numeric
+
+SPC9a <- SPC9a %>% #mulitple eta values by weight and find final sum
+  cbind(eta9a) %>%
+  mutate(weightedN = eta*value)
+
+eta9aFinal <- sum(SPC9a$weightedN)
+
+#9b
+#select first observation of each of the 32 particle size bins
+SPC9b <- SPC9b[1:32] %>%
+  head(1) %>%
+  gather()
+ 
+#Select final eta values for each bin for the correct run
+eta9b <- fauria_eta %>%
+  filter(...1 == "9b") %>%
+  gather() %>%
+  slice(-1) %>%
+  mutate(eta = value) %>%
+  select(-c(value, key))
+
+eta9b$eta <- as.double(eta9b$eta) #set to a numeric
+
+SPC9b <- SPC9b %>% #mulitple eta values by weight and find final sum
+  cbind(eta9b) %>%
+  mutate(weightedN = eta*value)
+
+eta9bFinal <- sum(SPC9b$weightedN)
+
+#16a
+#select first observation of each of the 32 particle size bins
+SPC16a <- SPC16a[1:32] %>%
+  head(1) %>%
+  gather()
+ 
+#Select final eta values for each bin for the correct run
+eta16a <- fauria_eta %>%
+  filter(...1 == "16a") %>%
+  gather() %>%
+  slice(-1) %>%
+  mutate(eta = value) %>%
+  select(-c(value, key))
+
+eta16a$eta <- as.double(eta16a$eta) #set to a numeric
+
+SPC16a <- SPC16a %>% #mulitple eta values by weight and find final sum
+  cbind(eta16a) %>%
+  mutate(weightedN = eta*value)
+
+eta16aFinal <- sum(SPC16a$weightedN)
+
+#16b
+#select first observation of each of the 32 particle size bins
+SPC16b <- SPC16b[1:32] %>%
+  head(1) %>%
+  gather()
+ 
+#Select final eta values for each bin for the correct run
+eta16b <- fauria_eta %>%
+  filter(...1 == "16b") %>%
+  gather() %>%
+  slice(-1) %>%
+  mutate(eta = value) %>%
+  select(-c(value, key))
+
+eta16b$eta <- as.double(eta16b$eta) #set to a numeric
+
+SPC16b <- SPC16b %>% #mulitple eta values by weight and find final sum
+  cbind(eta16b) %>%
+  mutate(weightedN = eta*value)
+
+eta16bFinal <- sum(SPC16b$weightedN)
+
+#17a
+#select first observation of each of the 32 particle size bins
+SPC17a <- SPC17a[1:32] %>%
+  head(1) %>%
+  gather()
+ 
+#Select final eta values for each bin for the correct run
+eta17a <- fauria_eta %>%
+  filter(...1 == "17a") %>%
+  gather() %>%
+  slice(-1) %>%
+  mutate(eta = value) %>%
+  select(-c(value, key))
+
+eta17a$eta <- as.double(eta17a$eta) #set to a numeric
+
+SPC17a <- SPC17a %>% #mulitple eta values by weight and find final sum
+  cbind(eta17a) %>%
+  mutate(weightedN = eta*value)
+
+eta17aFinal <- sum(SPC17a$weightedN)
+
+#17b
+#select first observation of each of the 32 particle size bins
+SPC17b <- SPC17b[1:32] %>%
+  head(1) %>%
+  gather()
+ 
+#Select final eta values for each bin for the correct run
+eta17b <- fauria_eta %>%
+  filter(...1 == "17b") %>%
+  gather() %>%
+  slice(-1) %>%
+  mutate(eta = value) %>%
+  select(-c(value, key))
+
+eta17b$eta <- as.double(eta17b$eta) #set to a numeric
+
+SPC17b <- SPC17b %>% #mulitple eta values by weight and find final sum
+  cbind(eta17b) %>%
+  mutate(weightedN = eta*value)
+
+eta17bFinal <- sum(SPC17b$weightedN)
+
+#18a
+#select first observation of each of the 32 particle size bins
+SPC18a <- SPC18a[1:32] %>%
+  head(1) %>%
+  gather()
+ 
+#Select final eta values for each bin for the correct run
+eta18a <- fauria_eta %>%
+  filter(...1 == "18a") %>%
+  gather() %>%
+  slice(-1) %>%
+  mutate(eta = value) %>%
+  select(-c(value, key))
+
+eta18a$eta <- as.double(eta18a$eta) #set to a numeric
+
+SPC18a <- SPC18a %>% #mulitple eta values by weight and find final sum
+  cbind(eta18a) %>%
+  mutate(weightedN = eta*value)
+
+eta18aFinal <- sum(SPC18a$weightedN)
+
+#18b
+#select first observation of each of the 32 particle size bins
+SPC18b <- SPC18b[1:32] %>%
+  head(1) %>%
+  gather()
+ 
+#Select final eta values for each bin for the correct run
+eta18b <- fauria_eta %>%
+  filter(...1 == "18b") %>%
+  gather() %>%
+  slice(-1) %>%
+  mutate(eta = value) %>%
+  select(-c(value, key))
+
+eta18b$eta <- as.double(eta18b$eta) #set to a numeric
+
+SPC18b <- SPC18b %>% #mulitple eta values by weight and find final sum
+  cbind(eta18b) %>%
+  mutate(weightedN = eta*value)
+
+eta18bFinal <- sum(SPC18b$weightedN)
 
 ```
 
-```{r fit linear function, include=TRUE}
+```{r Fauria single eta, include=TRUE}
 
-#Fit linear model
-y_hat <- data$logY
-logX1 <- data$logX1
-logX2 <- data$logX2
-logX3 <- data$logX3
-logX4 <- data$logX4
+#Import eta values by particle bin for selected runs
 
-linear_mod <- lm(y_hat ~ logX1 + logX2 + logX3 + logX4)
-
-plot(linear_mod)
+fauria_eta <- read_excel("data/flume_review_data_eta.xlsx", sheet = "Fauria_eta", col_names = FALSE)
 
 ```
 
