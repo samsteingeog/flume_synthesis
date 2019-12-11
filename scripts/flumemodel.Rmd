@@ -24,7 +24,7 @@ setwd("~/flume_synthesis")
 
 #import data
 #flume_data_test <- read_csv("data/flume_data_test.csv") 
-data <- read_excel("data/flume_review_data_eta.xlsx")
+data <- read_excel("data/flume_review_data.xlsx")
 
 ```
 
