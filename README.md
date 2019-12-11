@@ -2,7 +2,7 @@
 
 ### Developing a Functional Form of Particle Interception in Vegetated Wetlands
 ### Sam Stein, Laurel Larsen, and Jordan Wingenroth
-### Updated on: 11/25/2019
+### Updated on: 12/11/2019
 
 
 This repository contains code to fit the following formula (from Larsen 2014): 
