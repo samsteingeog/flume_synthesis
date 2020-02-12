@@ -14,9 +14,13 @@ library(ggpubr)
 library(boot)
 library(kableExtra)
 library(Metrics)
+library(readxl)
+library(grDevices)
+library(pals)
+library(MASS)
 
 #setWD
-setwd("~/flume_synthesis")
+#setwd("~/flume_synthesis")
 
 ```
 
@@ -32,8 +36,8 @@ data <- read_excel("data/flume_review_data.xlsx")
 ```{r data cleaning, include=TRUE, warning=FALSE}
 
 data <- data %>%
-  filter(!(is.na(eta))) %>% #only include runs with eta values
-  filter(!(paper == "Purich_2006")) #exclude purich results until eta values can be confirmed (likely need to account for density change from fresh to salt water)
+  filter(!(is.na(eta))) #%>% #only include runs with eta values
+  #filter(!(paper == "Purich_2006")) #Recalculated density of water in Purich and added in fluid density column to data; Purich data now included
   
 #Convert from character to numeric
 data$Re_c <- as.numeric(data$Re_c)
@@ -73,10 +77,10 @@ findJ <- function(a, #frontal area per unit volume
 #P value = ratio of particle density to water density
 #assuming 1 g/cm^3 density of water
 
-findP <- function(part_dense #particle density in g/cm^3
+findP <- function(part_dense, fluid_dense #particle density in g/cm^3
 ){
   
-  P <- part_dense/1
+  P <- part_dense/fluid_dense
   
   return(P)
 }
@@ -86,7 +90,7 @@ findP <- function(part_dense #particle density in g/cm^3
 data <- data %>%
   mutate(k = findK(Re_s = Re_c, a = frontal_area_unit_volume, h = height, d = d_c)) %>%
   mutate(j = findJ(a = frontal_area_unit_volume, d = d_c)) %>%
-  mutate(P = findP(part_dense = particle_density))
+  mutate(P = findP(part_dense = particle_density, fluid_dense = fluid_density))
 
 
 #log terms for later linear model fit
@@ -98,12 +102,21 @@ logdata <- data %>%
   mutate(logX4 = log(P)) %>%
   mutate(logY = log(eta))
 
-#Split into Re regime
-small_Re <- logdata %>%
+#Split into Re regime  
+#Based on Williamson 1996
+Re1 <- logdata %>%
   filter(Re_c <= 40)
 
-large_Re <- logdata %>%
-  filter(Re_c > 40)
+Re2 <- logdata %>%
+  filter(Re_c > 40) %>%
+  filter(Re_c <= 150)
+
+Re3 <- logdata %>%
+  filter(Re_c > 150) %>%
+  filter(Re_c <= 300)
+
+Re4 <- logdata %>%
+  filter(Re_c > 300)
 
 #Isolate just biofilm runs
 biofilm <- logdata %>%
@@ -135,15 +148,19 @@ findLogFit <- function(logdata){
 #Return linear model for entire dataset
 
 total_lm <- findLogFit(logdata = logdata)
-small_Re_lm <- findLogFit(logdata = small_Re)
-large_Re_lm <- findLogFit(logdata = large_Re)
+Re1_lm <- findLogFit(logdata = Re1)
+Re2_lm <- findLogFit(logdata = Re2)
+Re3_lm <- findLogFit(logdata = Re3)
+Re4_lm <- findLogFit(logdata = Re4)
 biofilm_lm <- findLogFit(logdata = biofilm)
 
 #pulling out R2 values for plotting bootstrap CI later
 total_R2 <- summary(total_lm)$r.square 
 bio_R2 <- summary(biofilm_lm)$r.square
-
-
+re1_R2 <- summary(Re1_lm)$r.square
+re2_R2 <- summary(Re2_lm)$r.square
+re3_R2 <- summary(Re3_lm)$r.square
+re4_R2 <- summary(Re4_lm)$r.square
 ```
 
 
@@ -168,73 +185,95 @@ lm_eqn <- function(data){
 ```
 
 
-```{r check linear function fit, include=TRUE, fig.width= 4}
+```{r check linear function fit 1, include=TRUE, fig.width= 4}
 
 #Predict values for entire data set
-
 logdata$predlogeta <- predict(total_lm)
-
 all <- ggplot(logdata, aes(x = logY, y = predlogeta)) + 
   geom_smooth(method = "lm", color = "black") +
-  geom_point(color = "darkblue", shape = 8, size = 1.5, alpha = .8) +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
   theme_minimal() + 
   labs(title = "a) All Runs", y = "predicted log(eta)", x = "observed log(eta)") +
-  geom_text(x = -8, y = -2, label = lm_eqn(logdata), parse = TRUE, size = 5)
+  geom_text(x = -8, y = -2, label = lm_eqn(logdata), parse = TRUE, size = 5) +
+  scale_fill_gradientn(colors = parula(100))
+  
 
 #Predict for Re regimes
-
-small_Re$predlogeta <- predict(small_Re_lm)
-
-small <- ggplot(small_Re, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
-  geom_point(color = "darkblue", shape = 8, size = 1.5, alpha = .8) +
+#Re <40
+Re1$predlogeta <- predict(Re1_lm)
+Re1_plot <- ggplot(Re1, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
   theme_minimal() + 
   labs(title = "c) Re < 40", y = "predicted log(eta)", x = "observed log(eta)") +
-  geom_text(x = -8, y = -2, label = lm_eqn(small_Re), parse = TRUE, size = 5)
+  geom_text(x = -8, y = -2, label = lm_eqn(Re1), parse = TRUE, size = 5)
 
-large_Re$predlogeta <- predict(large_Re_lm)
-
-large <- ggplot(large_Re, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
-  geom_point(color = "darkblue", shape = 8, size = 1.5, alpha = .8) +
+#Re 40-150
+Re2$predlogeta <- predict(Re2_lm)
+Re2_plot <- ggplot(Re2, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
   theme_minimal() + 
-  labs(title = "d) Re >40", y = "predicted log(eta)", x = "observed log(eta)") +
-  geom_text(x = -8, y = -2, label = lm_eqn(large_Re), parse = TRUE, size = 5)
+  labs(title = "c) Re 40-150", y = "predicted log(eta)", x = "observed log(eta)") +
+  geom_text(x = -8, y = -2, label = lm_eqn(Re2), parse = TRUE, size = 5)
+
+#Re 150-300
+Re3$predlogeta <- predict(Re3_lm)
+Re3_plot <- ggplot(Re3, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
+  theme_minimal() + 
+  labs(title = "c) Re 150-300", y = "predicted log(eta)", x = "observed log(eta)") +
+  geom_text(x = -8, y = -2, label = lm_eqn(Re3), parse = TRUE, size = 5)
+
+#Re > 300
+Re4$predlogeta <- predict(Re4_lm)
+Re4_plot <- ggplot(Re4, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
+  theme_minimal() + 
+  labs(title = "c) Re > 300", y = "predicted log(eta)", x = "observed log(eta)") +
+  geom_text(x = -8, y = -2, label = lm_eqn(Re4), parse = TRUE, size = 5)
 
 #Predict for runs with biofilm presence 
-
 biofilm$predlogeta <- predict(biofilm_lm)
-
 bio <- ggplot(biofilm, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
-  geom_point(color = "darkblue", shape = 8, size = 1.5, alpha = .8) +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_Cat)) +
   theme_minimal() + 
   labs(title = "b) Biofilm present", y = "predicted log(eta)", x = "observed log(eta)") +
   geom_text(x = -8, y = -2, label = lm_eqn(biofilm), parse = TRUE, size = 5)
 
+```
 
+
+```{r plot lin fit, include=TRUE, fig.width= 4}
 #Export pngs of plots
 
 png("all.png")
-
-ggarrange(all)
-
+print(all)
 dev.off()
 
 png("bio.png")
-
 ggarrange(bio)
-
 dev.off()
 
-png("small.png")
-
-ggarrange(small)
-
+png("Re1.png")
+ggarrange(Re1_plot)
 dev.off()
 
-png("large.png")
-
-ggarrange(large)
-
+png("Re2.png")
+ggarrange(Re2_plot)
 dev.off()
+
+png("Re3.png")
+ggarrange(Re3_plot)
+dev.off()
+
+png("Re4.png")
+ggarrange(Re4_plot)
+dev.off()
+
+```
+
+
+```{r check linear function fit 2, include=TRUE, fig.width= 4}
+
 
 #Check Residuals
 
@@ -259,8 +298,15 @@ bio_res <- ggplot(biofilm_lm) + geom_histogram(aes(x = biofilm_lm$residuals), co
   labs(title = "b) Biofilm Data", x = "Residual (log(eta))", y = "Frequency")
 
 ggarrange(all_res, bio_res, nrow=1)
-
 dev.off()
+
+
+#Find P values
+mu2 <- mu(biofilm$logY)
+mu1 <- mu(biofilm$predlogeta)
+
+t.test(biofilm$predlogeta, mu = mu1)
+
 
 ```
 
@@ -289,6 +335,17 @@ all_R2 <- boot(data = logdata, statistic = bootFitR2,  #all data
 biofilm_R2 <- boot(data = biofilm, statistic = bootFitR2,  #runs with biofilm
    R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
 
+Re1_R2 <- boot(data = Re1, statistic = bootFitR2,  #runs with Re <40
+   R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
+
+Re2_R2 <- boot(data = Re2, statistic = bootFitR2,  #runs with Re 40-150
+   R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
+
+Re3_R2 <- boot(data = Re3, statistic = bootFitR2,  #runs with Re 150-300
+   R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
+
+Re4_R2 <- boot(data = Re4, statistic = bootFitR2,  #runs with Re >300
+   R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
 
 #Get 95% confidence intervals of bootstrapped results
 
@@ -300,12 +357,30 @@ biofilm_R2_ci <- boot.ci(biofilm_R2, conf = 0.95, type = "norm")
 biofilm_R2_min <- biofilm_R2_ci$normal[2]
 biofilm_R2_max <- biofilm_R2_ci$normal[3]
 
-#plot R2 values
+Re1_R2_ci <- boot.ci(Re1_R2, conf = 0.95, type = "norm")
+Re1_R2_min <- Re1_R2_ci$normal[2]
+Re1_R2_max <- Re1_R2_ci$normal[3]
+
+Re2_R2_ci <- boot.ci(Re2_R2, conf = 0.95, type = "norm")
+Re2_R2_min <- Re2_R2_ci$normal[2]
+Re2_R2_max <- Re2_R2_ci$normal[3]
+
+Re3_R2_ci <- boot.ci(Re3_R2, conf = 0.95, type = "norm")
+Re3_R2_min <- Re3_R2_ci$normal[2]
+Re3_R2_max <- Re3_R2_ci$normal[3]
+
+Re4_R2_ci <- boot.ci(Re4_R2, conf = 0.95, type = "norm")
+Re4_R2_min <- Re4_R2_ci$normal[2]
+Re4_R2_max <- Re4_R2_ci$normal[3]
+```
+
+```{r plot bootstrap R2, include=TRUE, fig.width=10}
+#plot R2 values for all and biofilm
 
 all_R2_plot <- all_R2$t #extract just R2 values for all data
 all_R2_plot <- as.data.frame(all_R2_plot)
 
-biofilm_R2_plot <- biofilm_R2$t #extract just R2 values for all data
+biofilm_R2_plot <- biofilm_R2$t #extract just R2 values for biofilm data
 biofilm_R2_plot <- as.data.frame(biofilm_R2_plot)
 
 png("R2.png")
@@ -329,6 +404,55 @@ ggarrange(r2all, r2bio, nrow = 1, widths = 2)
 
 dev.off()
 
+#plot R2 values for data split by Re regime
+
+Re1_R2_plot <- Re1_R2$t #extract just R2 values for Re <40
+Re1_R2_plot <- as.data.frame(Re1_R2_plot)
+
+Re2_R2_plot <- Re2_R2$t #extract just R2 values for Re 40-150
+Re2_R2_plot <- as.data.frame(Re2_R2_plot)
+
+Re3_R2_plot <- Re3_R2$t #extract just R2 values for Re 150-300
+Re3_R2_plot <- as.data.frame(Re3_R2_plot)
+
+Re4_R2_plot <- Re4_R2$t #extract just R2 values for Re >300
+Re4_R2_plot <- as.data.frame(Re4_R2_plot)
+
+png("Re_R2.png")
+
+r2Re1 <- ggplot(Re1_R2_plot) + geom_histogram(aes(x = V1), color = "lightgrey", alpha = 0.9) +
+  geom_vline(aes(xintercept = Re1_R2_min), col="blue") +   #add lines for 95% CI bounds
+  geom_vline(aes(xintercept = Re1_R2_max), col="blue") + 
+  geom_vline(aes(xintercept = re1_R2), col="green") + #display R2 from original fit
+  theme_minimal() +
+  labs(title = "a) Re <40", x = "R2 values", y = "Frequency") 
+
+
+r2Re2 <- ggplot(Re2_R2_plot) + geom_histogram(aes(x = V1), color = "lightgrey", alpha = 0.9) +
+  geom_vline(aes(xintercept = Re2_R2_min), col="blue") +   #add lines for 95% CI bounds
+  geom_vline(aes(xintercept = Re2_R2_max), col="blue") + 
+  geom_vline(aes(xintercept = re2_R2), col="green") + #display R2 from original fit
+  theme_minimal() +
+  labs(title = "b) Re 40-150", x = "R2 values", y = "Frequency") 
+
+r2Re3 <- ggplot(Re3_R2_plot) + geom_histogram(aes(x = V1), color = "lightgrey", alpha = 0.9) +
+  geom_vline(aes(xintercept = Re3_R2_min), col="blue") +   #add lines for 95% CI bounds
+  geom_vline(aes(xintercept = Re3_R2_max), col="blue") + 
+  geom_vline(aes(xintercept = re3_R2), col="green") + #display R2 from original fit
+  theme_minimal() +
+  labs(title = "c) Re 150-300", x = "R2 values", y = "Frequency")
+
+r2Re4 <- ggplot(Re4_R2_plot) + geom_histogram(aes(x = V1), color = "lightgrey", alpha = 0.9) +
+  geom_vline(aes(xintercept = Re4_R2_min), col="blue") +   #add lines for 95% CI bounds
+  geom_vline(aes(xintercept = Re4_R2_max), col="blue") + 
+  geom_vline(aes(xintercept = re4_R2), col="green") + #display R2 from original fit
+  theme_minimal() +
+  labs(title = "d) Re >300", x = "R2 values", y = "Frequency")
+
+ggarrange(r2Re1, r2Re2, r2Re3, r2Re4)
+
+dev.off()
+
 ```
 
 ```{r bootstrap coef, include=TRUE}
@@ -346,7 +470,7 @@ bootFitCoef <- function(formula, logdata, indices){
 }
 
 #set seed
-set.seed(1234)
+set.seed(123)
 
 #set up bootstrap to return coef values using 10000 bootstraps
 
@@ -356,38 +480,114 @@ all_coef <- boot(data = logdata, statistic = bootFitCoef,  #all data
 biofilm_coef <- boot(data = biofilm, statistic = bootFitCoef,  #runs with biofilm
    R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
 
+Re1_coef <- boot(data = Re1, statistic = bootFitCoef,  #runs with Re <40
+   R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
 
+Re2_coef <- boot(data = Re2, statistic = bootFitCoef,  #runs with Re 40-150
+   R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
+
+Re3_coef <- boot(data = Re3, statistic = bootFitCoef,  #runs with Re 150-300
+   R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
+
+Re4_coef <- boot(data = Re4, statistic = bootFitCoef,  #runs with Re >300
+   R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
+
+```
+
+
+```{r create table of boot coef data}
+#all data
 #95% confidence interval of bootstraps
-
-all_coef_int <- boot.ci(all_coef, coef = 0.95, type = "bca", index = 1) #intersect
-all_coef_C1 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 2) #C1
-all_coef_C2 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 3) #C2
-all_coef_C3 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 4) #C3
-all_coef_C4 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 5) #C4
-
-biofilm_coef_int <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 1) #intersect
-biofilm_coef_C1 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 2) #C1
-biofilm_coef_C2 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 3) #C2
-biofilm_coef_C3 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 4) #C3
-biofilm_coef_C4 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 5) #C4
-
+all_int <- boot.ci(all_coef, coef = 0.95, type = "bca", index = 1) #intersect
+all_C1 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 2) #C1
+all_C2 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 3) #C2
+all_C3 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 4) #C3
+all_C4 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 5) #C4
 #Extract CI values 
-
-all_intersect <- all_coef_int$bca[4:5] #4 = min, 5 = max
-all_c1 <- all_coef_C1$bca[4:5]
-all_c2 <- all_coef_C2$bca[4:5]
-all_c3 <- all_coef_C3$bca[4:5]
-all_c4 <- all_coef_C4$bca[4:5]
-all_CI <- rbind(all_intersect, all_c1, all_c2, all_c3, all_c4)
+all_int <- all_int$bca[4:5] #4 = min, 5 = max
+all_C1 <- all_C1$bca[4:5]
+all_C2 <- all_C2$bca[4:5]
+all_C3 <- all_C3$bca[4:5]
+all_C4 <- all_C4$bca[4:5]
+all_CI <- rbind(all_int, all_C1, all_C2, all_C3, all_C4)
 all_CI <- as.data.frame(all_CI)
 
-biofilm_intersect <- biofilm_coef_int$bca[4:5]
-biofilm_c1 <- biofilm_coef_C1$bca[4:5]
-biofilm_c2 <- biofilm_coef_C2$bca[4:5]
-biofilm_c3 <- biofilm_coef_C3$bca[4:5]
-biofilm_c4 <- biofilm_coef_C4$bca[4:5]
-biofilm_CI <- rbind(biofilm_intersect, biofilm_c1, biofilm_c2, biofilm_c3, biofilm_c4)
+
+#biofilm
+biofilm_int <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 1) #intersect
+biofilm_C1 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 2) #C1
+biofilm_C2 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 3) #C2
+biofilm_C3 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 4) #C3
+biofilm_C4 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 5) #C4
+biofilm_int <- biofilm_coef_int$bca[4:5]
+biofilm_C1 <- biofilm_C1$bca[4:5]
+biofilm_C2 <- biofilm_C2$bca[4:5]
+biofilm_C3 <- biofilm_C3$bca[4:5]
+biofilm_C4 <- biofilm_C4$bca[4:5]
+biofilm_CI <- rbind(biofilm_int, biofilm_C1, biofilm_C2, biofilm_C3, biofilm_C4)
 biofilm_CI <- as.data.frame(biofilm_CI)
+
+
+#Re numbers <40
+#95% confidence interval of bootstraps
+Re1_int <- boot.ci(Re1_coef, coef = 0.95, type = "bca", index = 1) #intersect
+Re1_C1 <- boot.ci(Re1_coef, conf = 0.95, type = "bca", index = 2) #C1
+Re1_C2 <- boot.ci(Re1_coef, conf = 0.95, type = "bca", index = 3) #C2
+Re1_C3 <- boot.ci(Re1_coef, conf = 0.95, type = "bca", index = 4) #C3
+Re1_C4 <- boot.ci(Re1_coef, conf = 0.95, type = "bca", index = 5) #C4
+#Extract CI values 
+Re1_int <- Re1_int$bca[4:5] #4 = min, 5 = max
+Re1_C1 <- Re1_C1$bca[4:5]
+Re1_C2 <- Re1_C2$bca[4:5]
+Re1_C3 <- Re1_C3$bca[4:5]
+Re1_C4 <- Re1_C4$bca[4:5]
+Re1_CI <- rbind(Re1_int, Re1_C1, Re1_C2, Re1_C3, Re1_C4)
+Re1_CI <- as.data.frame(Re1_CI)
+
+#Re numbers 40-150
+Re2_int <- boot.ci(Re2_coef, coef = 0.95, type = "bca", index = 1) #intersect
+Re2_C1 <- boot.ci(Re2_coef, conf = 0.95, type = "bca", index = 2) #C1
+Re2_C2 <- boot.ci(Re2_coef, conf = 0.95, type = "bca", index = 3) #C2
+Re2_C3 <- boot.ci(Re2_coef, conf = 0.95, type = "bca", index = 4) #C3
+Re2_C4 <- boot.ci(Re2_coef, conf = 0.95, type = "bca", index = 5) #C4
+#Extract CI values 
+Re2_int <- Re2_int$bca[4:5] #4 = min, 5 = max
+Re2_C1 <- Re2_C1$bca[4:5]
+Re2_C2 <- Re2_C2$bca[4:5]
+Re2_C3 <- Re2_C3$bca[4:5]
+Re2_C4 <- Re2_C4$bca[4:5]
+Re2_CI <- rbind(Re2_int, Re2_C1, Re2_C2, Re2_C3, Re2_C4)
+Re2_CI <- as.data.frame(Re2_CI)
+
+#Re numbers 150-300
+Re3_int <- boot.ci(Re3_coef, coef = 0.95, type = "bca", index = 1) #intersect
+Re3_C1 <- boot.ci(Re3_coef, conf = 0.95, type = "bca", index = 2) #C1
+Re3_C2 <- boot.ci(Re3_coef, conf = 0.95, type = "bca", index = 3) #C2
+Re3_C3 <- boot.ci(Re3_coef, conf = 0.95, type = "bca", index = 4) #C3
+Re3_C4 <- boot.ci(Re3_coef, conf = 0.95, type = "bca", index = 5) #C4
+#Extract CI values 
+Re3_int <- Re3_int$bca[4:5] #4 = min, 5 = max
+Re3_C1 <- Re3_C1$bca[4:5]
+Re3_C2 <- Re3_C2$bca[4:5]
+Re3_C3 <- Re3_C3$bca[4:5]
+Re3_C4 <- Re3_C4$bca[4:5]
+Re3_CI <- rbind(Re3_int, Re3_C1, Re3_C2, Re3_C3, Re3_C4)
+Re3_CI <- as.data.frame(Re3_CI)
+
+#Re numbers >300
+Re4_int <- boot.ci(Re4_coef, coef = 0.95, type = "bca", index = 1) #intersect
+Re4_C1 <- boot.ci(Re4_coef, conf = 0.95, type = "bca", index = 2) #C1
+Re4_C2 <- boot.ci(Re4_coef, conf = 0.95, type = "bca", index = 3) #C2
+Re4_C3 <- boot.ci(Re4_coef, conf = 0.95, type = "bca", index = 4) #C3
+Re4_C4 <- boot.ci(Re4_coef, conf = 0.95, type = "bca", index = 5) #C4
+#Extract CI values 
+Re4_int <- Re4_int$bca[4:5] #4 = min, 5 = max
+Re4_C1 <- Re4_C1$bca[4:5]
+Re4_C2 <- Re4_C2$bca[4:5]
+Re4_C3 <- Re4_C3$bca[4:5]
+Re4_C4 <- Re4_C4$bca[4:5]
+Re4_CI <- rbind(Re4_int, Re4_C1, Re4_C2, Re4_C3)
+Re4_CI <- as.data.frame(Re4_CI)
 
 #Vectors of min and max coefs
 min_all <- all_CI$V1
@@ -396,12 +596,27 @@ max_all <- all_CI$V2
 min_biofilm <- biofilm_CI$V1
 max_biofilm <- biofilm_CI$V2
 
+min_Re1 <- Re1_CI$V1
+max_Re1 <- Re1_CI$V2
+
+min_Re2 <- Re2_CI$V1
+max_Re2 <- Re2_CI$V2
+
+min_Re3 <- Re3_CI$V1
+max_Re3 <- Re3_CI$V2
+
+min_Re4 <- Re4_CI$V1
+max_Re4 <- Re4_CI$V2
+
 #Vectors of fitted model coefs
 fit_all <- total_lm$coefficients
 fit_biofilm <- biofilm_lm$coefficients
+fit_Re1 <- Re1_lm$coefficients
+fit_Re2 <- Re2_lm$coefficients
+fit_Re3 <- Re3_lm$coefficients
+fit_Re4 <- Re4_lm$coefficients
 
 #Table with 95% CI min/max results and fitted models
-
 table_all_fit <- rbind(min_all, fit_all, max_all) 
 table_all_fit <- as.data.frame(table_all_fit) 
 table_all_fit <-  table_all_fit %>%
@@ -421,6 +636,46 @@ table_biofilm_fit <-  table_biofilm_fit %>%
          C3 = logX3,
          C4 = logX4)
 row.names(table_biofilm_fit) <- c("Min", "Fit", "Max")
+
+table_Re1_fit <- rbind(min_Re1, fit_Re1, max_Re1) 
+table_Re1_fit <- as.data.frame(table_Re1_fit) 
+table_Re1_fit <-  table_Re1_fit %>%
+  select(Intercept = '(Intercept)',
+         C1  = logX1,
+         C2 = logX2,
+         C3 = logX3,
+         C4 = logX4)
+row.names(table_Re1_fit) <- c("Min", "Fit", "Max")
+
+table_Re2_fit <- rbind(min_Re2, fit_Re2, max_Re2) 
+table_Re2_fit <- as.data.frame(table_Re2_fit) 
+table_Re2_fit <-  table_Re2_fit %>%
+  select(Intercept = '(Intercept)',
+         C1  = logX1,
+         C2 = logX2,
+         C3 = logX3,
+         C4 = logX4)
+row.names(table_Re2_fit) <- c("Min", "Fit", "Max")
+
+table_Re3_fit <- rbind(min_Re3, fit_Re3, max_Re3) 
+table_Re3_fit <- as.data.frame(table_Re3_fit) 
+table_Re3_fit <-  table_Re3_fit %>%
+  select(Intercept = '(Intercept)',
+         C1  = logX1,
+         C2 = logX2,
+         C3 = logX3,
+         C4 = logX4)
+row.names(table_Re3_fit) <- c("Min", "Fit", "Max")
+
+table_Re4_fit <- rbind(min_Re4, fit_Re4, max_Re4) 
+table_Re4_fit <- as.data.frame(table_Re4_fit) 
+table_Re4_fit <-  table_Re4_fit %>%
+  select(Intercept = '(Intercept)',
+         C1  = logX1,
+         C2 = logX2,
+         C3 = logX3,
+         C4 = logX4)
+row.names(table_Re4_fit) <- c("Min", "Fit", "Max")
 
 ```
 
