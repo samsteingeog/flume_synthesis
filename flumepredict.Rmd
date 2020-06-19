@@ -1,0 +1,88 @@
+---
+title: "flumepredict"
+author: "Sam Stein"
+date: "6/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r data import, include=TRUE, warning=FALSE}
+
+#Sam -  import model here
+
+#import data
+testdata <- read_csv("data/flume_BOE.csv")
+
+```
+
+```{r data processing, include=TRUE, warning=FALSE}
+
+testdata <- testdata %>%
+  filter(!(is.na(run_ID))) #only include observations with data in them
+
+  
+#Convert from character to numeric
+testdata$Re_c <- as.numeric(testdata$Re_c)
+testdata$height <- as.numeric(testdata$height)
+testdata$ave_velocity <- as.numeric(testdata$ave_velocity)
+
+
+testdata <- testdata %>%
+  mutate(J = findJ(a = frontal_area_unit_volume, d = d_c)) %>%
+  mutate(L = findL(U=ave_velocity, a = frontal_area_unit_volume, d_c = d_c, mu=kin_viscosity_m2))
+
+#log terms for later linear model fit
+
+testdata <- testdata %>%
+  mutate(logX1 = log(Re_c)) %>%
+  mutate(logX2 = log(J)) %>%
+  mutate(logX4 = log(radius_ratio)) %>%
+  mutate(logX5 = log(L)) 
+
+
+```
+
+
+```{r predict eta values, include=TRUE, warning=FALSE}
+
+#Use CV version of trained model to predict eta value
+
+testdata$predlogeta <- predict(object = total_lm2_final, newdata = testdata)
+
+#convert back from log(eta) to eta
+
+testdata$predeta <- exp(testdata$predlogeta)
+
+```
+
+```{r quick BOE calcs, include=TRUE, warning=FALSE}
+
+
+#set particle concentration
+C <- .01 #mg/cm3
+#set number of collecters per area
+n_c <- testdata$c_density/(100*100) # number of collecters/cm2
+
+#calculate mass collected over area and time (mg/cm2sec)
+Qc <- testdata$predeta[1]*C*testdata$ave_velocity[1]*testdata$d_c[1]*n_c[1]*testdata$height[1]
+
+#set rough settling velocity
+w_se <- .001 #cm/sec
+
+#calculate mass settled over area and time
+Qs <- w_se*C
+
+#set organic accretion
+O <- .00001 #cm/sec
+#set erosion rate 
+E <- .008 #cm/sec
+
+dzdt <- (Qc/(testdata$p_density[1]/1000)) + (Qs/(testdata$p_density[1]/1000)) + O - E
+
+yearz <- dCdt * 60 * 60 * 24 * 365
+```
+
+
