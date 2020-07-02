@@ -70,14 +70,14 @@ findJ <- function(a, #frontal area per unit volume
 }
 
 ######DROPPED FROM MODEL
-#P value = ratio of particle density to water density
-#Associated with term c3
+# P value = ratio of particle density to water density
+# Associated with term c3
 # findP <- function(part_dense, #particle density in g/cm^3
 #                   fluid_dense #fluid density in g/cm^3
 # ){
-#   
+# 
 #   P <- part_dense/fluid_dense
-#   
+# 
 #   return(P)
 # }
 ######DROPPED FROM MODEL
@@ -101,7 +101,7 @@ findL <- function(U, #Average velocity of fluid
 
 data <- data %>%
   mutate(J = findJ(a = frontal_area_unit_volume, d = d_c)) %>%
- # mutate(P = findP(part_dense = p_density, fluid_dense = f_density)) %>%
+  mutate(P = findP(part_dense = p_density, fluid_dense = f_density)) %>%
   mutate(L = findL(U=ave_velocity_cm, a = frontal_area_unit_volume, d_c = d_c, mu=kin_viscosity_cm2))
 
 #log terms for later linear model fit
@@ -109,7 +109,7 @@ data <- data %>%
 logdata <- data %>%
   mutate(logX1 = log(Re_c)) %>%
   mutate(logX2 = log(J)) %>%
-  #mutate(logX3 = log(P)) %>%
+ # mutate(logX3 = log(P)) %>%
   mutate(logX4 = log(radius_ratio)) %>%
   mutate(logX5 = log(L)) %>%
   mutate(logY = log(eta))
@@ -136,6 +136,11 @@ Re2 <- logdata %>%
 single <- logdata %>%
   filter(c_density == 1) 
 
+#Just multi-collector runs
+
+multi <- logdata %>%
+  filter(!(c_density ==1))
+
 ```
 
 
@@ -151,7 +156,7 @@ findLogFit <- function(logdata){
   logY <- logdata$logY
   logX1 <- logdata$logX1
   logX2 <- logdata$logX2
-#  logX3 <- logdata$logX3
+ # logX3 <- logdata$logX3
   logX4 <- logdata$logX4
   logX5 <- logdata$logX5
 
@@ -166,6 +171,7 @@ findLogFit <- function(logdata){
 total_lm <- findLogFit(logdata = logdata)
 biofilm_lm <- findLogFit(logdata = biofilm)
 single_lm <- findLogFit(logdata = single)
+multi_lm <- findLogFit(logdata = multi)
 Re1_lm <- findLogFit(logdata = Re1)
 Re2_lm <- findLogFit(logdata = Re2)
 palmer_lm <- findLogFit(logdata = Re_Palmer)
@@ -183,7 +189,7 @@ re2_R2 <- summary(Re2_lm)$r.square
 
 #Write function to find linear fit
 
-control <- trainControl(method= "cv", number = 5)
+control <- trainControl(method= "cv", number = 5) #5 fold cross validation
 
 
 findLogFit2 <- function(logdata){
@@ -194,7 +200,7 @@ findLogFit2 <- function(logdata){
   logY <- logdata$logY
   logX1 <- logdata$logX1
   logX2 <- logdata$logX2
-  #logX3 <- logdata$logX3
+ # logX3 <- logdata$logX3
   logX4 <- logdata$logX4
   logX5 <- logdata$logX5
 
@@ -272,11 +278,11 @@ train_Re1$results #Check results (select smallest RMSE and highest R2)
 
 lm_eqn <- function(data){
     m <- lm(data$logY ~ data$logX1 + data$logX2 + data$logX4 + data$logX5)
-    eq <- substitute(~~italic(r)^2~"="~r2, #italic(logY == int + c1*logX1 + c2*logX2 + c3*logX3 + c4*logX4 + c5*logX5) *","
+    eq <- substitute(~~italic(r)^2~"="~r2, #italic(logY == int + c1*logX1 + c2*logX2 + c4*logX4 + c5*logX5) *","
          list(int = format(unname(coef(m)[1]), digits = 2),
               c1 = format(unname(coef(m)[2]), digits = 2),
               c2 = format(unname(coef(m)[3]), digits = 2),
-              #c3 = format(unname(coef(m)[4]), digits = 2),
+          #    c3 = format(unname(coef(m)[4]), digits = 2),
               c4 = format(unname(coef(m)[5]), digits = 2),
               c5 = format(unname(coef(m)[6]), digits = 2),
               r2 = format(summary(m)$r.squared, digits = 3)))
@@ -294,7 +300,7 @@ lm_eqn <- function(data){
 
 lm_eqn2 <- function(data, control){
     m <- train(data$logY ~ data$logX1 + data$logX2 + data$logX4 + data$logX5, data = data, trControl = control)
-    eq <- substitute(~~italic(r)^2~"="~r2, #italic(logY == int + c1*logX1 + c2*logX2 + c3*logX3 + c4*logX4 + c5*logX5) *","
+    eq <- substitute(~~italic(r)^2~"="~r2, #italic(logY == int + c1*logX1 + c2*logX2 + c4*logX4 + c5*logX5) *","
          list(int = format(unname(coef(m)[1]), digits = 2),
               c1 = format(unname(coef(m)[2]), digits = 2),
               c2 = format(unname(coef(m)[3]), digits = 2),
@@ -317,8 +323,8 @@ all <- ggplot(logdata, aes(x = logY, y = predlogeta)) +
   geom_smooth(method = "lm", color = "black") +
   geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
   theme_minimal() + 
-  labs(title = "a) All Runs", y = "predicted log(eta)", x = "observed log(eta)") +
-  geom_text(x = -8, y = -2, label = lm_eqn(logdata), parse = TRUE, size = 5) +
+  labs(title = "All Runs (particle density)", y = "predicted log(eta)", x = "observed log(eta)") +
+  geom_text(x = -8, y = -5, label = lm_eqn(logdata), parse = TRUE, size = 5) +
   scale_color_viridis_c(option = "plasma")
   
 #Predict for runs with biofilm presence 
@@ -335,8 +341,18 @@ single$predlogeta <- predict(single_lm)
 sing <- ggplot(single, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
   geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
   theme_minimal() + 
-  labs(title = "g) Single Collector Studies", y = "predicted log(eta)", x = "observed log(eta)") +
-  geom_text(x = -8, y = -2, label = lm_eqn(biofilm), parse = TRUE, size = 5) +
+  labs(title = "Single Collector Studies", y = "predicted log(eta)", x = "observed log(eta)") +
+  geom_text(x = -8, y = -5, label = lm_eqn(biofilm), parse = TRUE, size = 5) +
+  scale_color_viridis_c(option = "plasma")
+
+
+#Predict for multi collector studies
+multi$predlogeta <- predict(multi_lm)
+mult <- ggplot(multi, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
+  theme_minimal() + 
+  labs(title = "Multi Collector Studies", y = "predicted log(eta)", x = "observed log(eta)") +
+  geom_text(x = -8, y = -5, label = lm_eqn(biofilm), parse = TRUE, size = 5) +
   scale_color_viridis_c(option = "plasma")
 
 #Predict for Re regimes
@@ -344,20 +360,20 @@ sing <- ggplot(single, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm
 Re1$predlogeta <- predict(Re1_lm)
 Re1_plot <- ggplot(Re1, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
   geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
-  lims(x=c(-9, -1), y=c(-9,-1)) +
+  lims(x=c(-9, -5), y=c(-9,-5)) +
   theme_minimal() + 
   labs(title = "c) Re =< 40", y = "predicted log(eta)", x = "observed log(eta)") +
-  geom_text(x = -8, y = -2, label = lm_eqn(Re1), parse = TRUE, size = 5) +
+  geom_text(x = -8.5, y = -5.5, label = lm_eqn(Re1), parse = TRUE, size = 5) +
   scale_color_viridis_c(option = "plasma")
 
 #Re >40
 Re2$predlogeta <- predict(Re2_lm)
 Re2_plot <- ggplot(Re2, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
   geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
-  lims(x=c(-11, 1), y=c(-11,1)) +
+  lims(x=c(-9, -4.5), y=c(-9,-4.5)) +
   theme_minimal() + 
   labs(title = "d) Re > 40", y = "predicted log(eta)", x = "observed log(eta)") +
-  geom_text(x = -8, y = -2, label = lm_eqn(Re2), parse = TRUE, size = 5) +
+  geom_text(x = -8.5, y = -5.5, label = lm_eqn(Re2), parse = TRUE, size = 5) +
   scale_color_viridis_c(option = "plasma")
 
 
@@ -414,7 +430,7 @@ bio2 <- ggplot(biofilm, aes(x = logY, y = predlogeta2)) + geom_smooth(method = "
 ```{r plot lin fit, include=TRUE, fig.width= 4}
 #Export pngs of plots
 
-png("graphics/all.png")
+png("graphics/allupdated.png")
 print(all)
 dev.off()
 
@@ -426,11 +442,15 @@ png("graphics/single.png")
 ggarrange(sing)
 dev.off()
 
-png("graphics/Re1.png")
+png("graphics/multi.png")
+ggarrange(mult)
+dev.off()
+
+png("graphics/Re1updated.png")
 ggarrange(Re1_plot)
 dev.off()
 
-png("graphics/Re2.png")
+png("graphics/Re2updated.png")
 ggarrange(Re2_plot)
 dev.off()
 
@@ -543,6 +563,7 @@ dev.off()
 #access link: https://gist.github.com/tomhopper/8c204d978c4a0cbcb8c0
 
 #predictive R2 is an adjusted veriod of R2 that estimates how well the model will predict new values by removing one sample point at a time from the model
+#ie can fudge an out of sample estimate using your existing data set
 
 pred_r_squared <- function(linear.model) {
   #' Use anova() to get the sum of squares for the linear model
@@ -566,13 +587,16 @@ PRESS <- function(linear.model) {
   return(PRESS)
 }
 
-pred_all <- pred_r_squared(total_lm)
+pred_all <- pred_r_squared(total_lm) #Most of these are fairly close to the actual R2
 pred_bio <- pred_r_squared(biofilm_lm)
-pred_re1 <- pred_r_squared(Re1_lm)
+pred_re1 <- pred_r_squared(Re1_lm) #This is very far off (.1 vs .9), way overfit for small sample
 pred_re2 <- pred_r_squared(Re2_lm)
 
 pred_all2 <- pred_r_squared(total_lm2_final)
 pred_bio2 <- pred_r_squared(biofilm_lm2_final)
+
+#all: 0.51 and bio: 0.49 for dataset with 5 mode Fauria data
+#all:.36 and bio:.38 for dataset with 1 mode fauria data
 
 ```
 

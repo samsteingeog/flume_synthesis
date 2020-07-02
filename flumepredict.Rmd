@@ -13,6 +13,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 #Sam -  import model here
 
+#Test data has Re, a, u, and d_c/d_p values that are similar to values from previous flume experiments (ie Re values <600, particles consistent with silt, etc)
+
 #import data
 testdata <- read_csv("data/flume_BOE.csv")
 
@@ -29,10 +31,10 @@ testdata$Re_c <- as.numeric(testdata$Re_c)
 testdata$height <- as.numeric(testdata$height)
 testdata$ave_velocity <- as.numeric(testdata$ave_velocity)
 
-
+#Calculate aggregate terms (see flumemodel.Rmd for more details on functions)
 testdata <- testdata %>%
   mutate(J = findJ(a = frontal_area_unit_volume, d = d_c)) %>%
-  mutate(L = findL(U=ave_velocity, a = frontal_area_unit_volume, d_c = d_c, mu=kin_viscosity_m2))
+  mutate(L = findL(U=ave_velocity, a = frontal_area_unit_volume, d_c = d_c, mu=kin_viscosity_cm2))
 
 #log terms for later linear model fit
 
@@ -48,9 +50,9 @@ testdata <- testdata %>%
 
 ```{r predict eta values, include=TRUE, warning=FALSE}
 
-#Use CV version of trained model to predict eta value
+#Use trained model (currently using model trained on entire dataset) to predict eta value
 
-testdata$predlogeta <- predict(object = total_lm2_final, newdata = testdata)
+testdata$predlogeta <- predict(object = total_lm2, newdata = testdata)
 
 #convert back from log(eta) to eta
 
@@ -58,31 +60,115 @@ testdata$predeta <- exp(testdata$predlogeta)
 
 ```
 
-```{r quick BOE calcs, include=TRUE, warning=FALSE}
+```{r setup environmental conditions, include=TRUE, warning=FALSE}
 
 
-#set particle concentration
-C <- .01 #mg/cm3
+#set particle concentration in fluid
+C <- .01 #mg/cm^3
+#NOTE TO SAM: find SSC of example ecosystem or calculate ave C from flume studies
+
+
+#set area of example plot
+area <- (100*100) #cm^2
+  
 #set number of collecters per area
-n_c <- testdata$c_density/(100*100) # number of collecters/cm2
+n_c <- testdata$c_density/area # number of collecters/cm^2
 
-#calculate mass collected over area and time (mg/cm2sec)
-Qc <- testdata$predeta[1]*C*testdata$ave_velocity[1]*testdata$d_c[1]*n_c[1]*testdata$height[1]
-
-#set rough settling velocity
-w_se <- .001 #cm/sec
-
-#calculate mass settled over area and time
-Qs <- w_se*C
+roe_w <- testdata$f_density #density of fluid (g/cm^3)
+roe_p <- testdata$p_density #density of particle (g/cm^3)
 
 #set organic accretion
 O <- .00001 #cm/sec
 #set erosion rate 
-E <- .008 #cm/sec
+E <- .08 #cm/sec
+#NOTE TO SAM: make this your next research priority
+#Set compaction rate
+Cmp <- 0
 
-dzdt <- (Qc/(testdata$p_density[1]/1000)) + (Qs/(testdata$p_density[1]/1000)) + O - E
+```
 
-yearz <- dCdt * 60 * 60 * 24 * 365
+As per Mudd et al 2010 paper, change in marsh elevation over time is expressed as: 
+
+dsig/dt = Qc/roes + Qs/roes + O - E - Cmp
+
+```{r mass capture, include=TRUE, warning=FALSE}
+
+#Using eqn #4 from Mudd et al 2010
+#mass captured = eta * C * kinematic viscosity * collector diameter * # collectors/area * height 
+
+eta <- testdata$predeta
+u <- testdata$ave_velocity
+d_c <- testdata$d_c
+h <- testdata$height
+
+#calculate mass collected over area and time (mg/cm2sec)
+Qc <- eta*C*u*d_c*n_c*h
+
+```
+
+```{r settling capture, include=TRUE, warning=FALSE}
+
+#Working from eqns 9-17 from Mudd et al 2010
+
+#effective settling velocity = settline velocity - upward motion from turbulence 
+
+d_p <- testdata$d_p_cm #particle diameter (cm)
+A <- 38.0 #from Camenen 2007 for silt (see Mudd table 1)  (dimensionless coefs based on particle material/shape)
+Ff <- 3.55 #from Camenen 2007 for silt (see Mudd table 1)  
+m <- 1.12 #from Camenen 2007 for silt (see Mudd table 1)  
+g <-   980.665  #acceleration due to gravity (cm/sec^2)
+s <-  testdata$p_density/testdata$f_density  #ratio of particle - water density 
+v <- testdata$kin_viscosity_cm2 #kinematic viscosity (cm^2/sec)
+
+K_vk <- 0.4 #von Karman constant, assumed
+
+
+alpha_k <- 0.9 #from Nepf 1999
+a <- testdata$frontal_area_unit_volume #frontal area/unit volume (cm^-1)  
+
+c_dense <- testdata$c_density #number of collectors
+alpha_0 <- 11 #from Tanino and Nepf 2008 (see Mudd table 1)
+Re <- testdata$Re_c
+
+#eqn : drag coefficient (C_D) 
+m = c_dense / area #number of collectors per area
+
+phi = (m * pi * (d_c)^2)/4  #solid volume fraction (from Tanino and Nepf 2008)
+
+alpha_1 = 0.46 + (3.8 * phi) # (eqn 13 from Tanino and Nepf 2008)
+
+C_D = 2*((alpha_0/Re)+alpha_1)
+
+#eqn 15: turbulent energy per unit mass of water (k) 
+
+k = (alpha_k^2)*(u^2)*((C_D*a*d_c)^(2/3))
+
+#eqn 10: settling velocity in turbulence free water
+
+w_s = (v/d_p)*(((1/4)*((A/Ff)^(2/m))+((4*(d_p^3)*g*(s-1))/(3*Ff*(v^2))^(1/m))^(1/2)-(1/2)*(A/Ff)^(1/m))^m)
+
+#eqn 14: calculate shear velocity (u*)
+
+u_star = ((0.2 * k)/roe_w)^(1/2)
+
+#eqn 11: upward velocity 
+
+w_up = K_vk*u_star 
+
+#eqn 9: mass settled = effective settling velocity * C
+w_eff = w_s - w_up  #effecitve settling velocity = settling with no turbulence - upward motion from turbulence 
+
+Qs = w_eff * C
+
+```
+
+
+```{r quick BOE calcs, include=TRUE, warning=FALSE}
+
+
+dzdt <- (Qc/roe_p) + (Qs/roe_p) + O - E - Cmp
+
+yearz <- dzdt * 60 * 60 * 24 * 365
 ```
 
 
