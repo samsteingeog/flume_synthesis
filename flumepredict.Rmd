@@ -119,21 +119,17 @@ m <- 1.12 #from Camenen 2007 for silt (see Mudd table 1)
 g <-   980.665  #acceleration due to gravity (cm/sec^2)
 s <-  testdata$p_density/testdata$f_density  #ratio of particle - water density 
 v <- testdata$kin_viscosity_cm2 #kinematic viscosity (cm^2/sec)
-
 K_vk <- 0.4 #von Karman constant, assumed
-
-
 alpha_k <- 0.9 #from Nepf 1999
 a <- testdata$frontal_area_unit_volume #frontal area/unit volume (cm^-1)  
-
 c_dense <- testdata$c_density #number of collectors
 alpha_0 <- 11 #from Tanino and Nepf 2008 (see Mudd table 1)
-Re <- testdata$Re_c
+Re <- testdata$Re_c #Reynolds number
 
-#eqn : drag coefficient (C_D) 
-m = c_dense / area #number of collectors per area
+#eqn 16: drag coefficient (C_D) 
+num = c_dense / area #number of collectors per area
 
-phi = (m * pi * (d_c)^2)/4  #solid volume fraction (from Tanino and Nepf 2008)
+phi = (num * pi * (d_c)^2)/4  #solid volume fraction (from Tanino and Nepf 2008)
 
 alpha_1 = 0.46 + (3.8 * phi) # (eqn 13 from Tanino and Nepf 2008)
 
