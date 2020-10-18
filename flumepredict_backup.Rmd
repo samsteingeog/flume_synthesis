@@ -1,0 +1,715 @@
+---
+title: "flumepredict_backup"
+author: "Sam Stein"
+date: "6/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(metR)
+library(svglite)
+```
+
+```{r data import, include=TRUE, warning=FALSE}
+
+#Sam -  import model here
+#Possibly use rdata file from flumemodel to avoid waiting for bootstraps to load
+
+
+#import data
+#testdata <- read_csv("data/flume_BOE.csv") #Quick test set for debugging 
+
+#testdata <- read_csv("data/field_flume_data.csv") #WLD field flume
+
+#Read in copy of data from Mudd et al 2010 Figure 5
+mudd_data <- read_csv("data/muddtestdata.csv") 
+
+#Read in data using biomass, collector diameter, and velocity data from Figure 5 in Mudd, frontal area range from Nepf, and standard particle diameter data from other papers 
+
+#10 micron particles
+data_10 <- read_csv("data/design_data_10.csv") #Fauria and Poirier indicated ~10um was a mode 
+#40 micron particles 
+data_40 <- read_csv("data/design_data_40.csv") #Laurel suggestion of 40um
+#60 micron particles
+data_60 <- read_csv("data/design_data_60.csv") #Olliver used 50um as a mode for WLD
+
+#Debugging data sheet
+
+debug_data <- read_csv("data/design_data_debug_beta.csv")
+
+debug_datag <- read_csv("data/design_data_debug_gamma.csv")
+
+debug_dataa <- read_csv("data/design_data_debug_alpha.csv")
+
+```
+
+```{r predeta function}
+#write function to clean data and return predicted eta values from flume synthesis model
+predEta <- function(data, #dataset (variable names must match those in function) 
+                    model #model (from flumemodel.Rmd)
+                    ){
+ 
+  data <- data %>%
+  filter(!(is.na(run_ID))) #only include observations with data in them
+
+  #Convert from character to numeric
+  data$Re_c <- as.numeric(data$Re_c)
+  data$height <- as.numeric(data$height)
+  data$ave_velocity <- as.numeric(data$ave_velocity)
+
+  #Calculate aggregate terms (see flumemodel.Rmd for more details on functions)
+  data <- data %>%
+    mutate(K = findK(Re = Re_c, a = frontal_area_unit_volume, h = height, d = d_c)) %>%
+    mutate(J = findJ(a = frontal_area_unit_volume, d = d_c)) %>%
+    mutate(L = findL(U=ave_velocity, a = frontal_area_unit_volume, d_c = d_c, mu=kin_viscosity_cm2))
+
+  #log terms for later linear model fit
+
+  data <- data %>%
+    mutate(logX1 = log(K)) %>%
+    mutate(logX2 = log(J)) %>%
+    mutate(logX3 = log(p_density/f_density)) %>%
+    mutate(logX4 = log(radius_ratio)) %>%
+    mutate(logX5 = log(L)) 
+  
+  
+  data$predlogeta <- predict(object = model, newdata = data) #Eqn trained on all data
+
+  #convert back from log(eta) to eta
+
+  data$predeta <- exp(data$predlogeta)
+  
+  return(data)
+   
+}
+
+
+```
+
+```{r get predicted eta values}
+
+#Predict eta values using flume synthesis model
+#test data
+mudd_data <- predEta(data = mudd_data, model = noc5_lm)
+
+#Inflate eta by 10x (to reflect that field flumes tend to have one order of magnitude higher eta)
+
+mudd_data$predeta10x <- mudd_data$predeta * 10 
+
+#wetland design data
+data_10 <- predEta(data = data_10, model = noc5_lm)
+data_40 <- predEta(data = data_40, model = noc5_lm)
+data_60 <- predEta(data = data_60, model = noc5_lm)
+
+debug_dataa <- predEta(data = debug_dataa, model = noc5_lm)
+debug_datab <- predEta(data = debug_data, model = noc5_lm)
+debug_datag <- predEta(data = debug_datag, model = noc5_lm)
+```
+
+
+
+```{r setup environmental conditions CM, include=TRUE, warning=FALSE}
+
+
+#set particle concentration in fluid
+C <- 25 #g/cm^3
+
+#This value is ~ average between high tide and low tide ssc from Mudd 2010 (see page 9)
+#NOTE TO SAM: redo these values based on water column height/tidal amplitude
+#Olliver et al 2020 has SSC values for WLD across different tidal heights; slot in here
+
+
+#set area of example plot
+area <- (100*100) #cm^2
+
+#set organic accretion
+#O <- 0.000000000000182 #cm/sec
+#set erosion rate 
+E <- .000 #m/sec
+#Assumed to be zero in vegetated environments based on D'alpaos et al 2007
+#Set compaction rate
+Cmp <- 0 #m/sec
+#Assuming zero across sub-annual to annual time scale
+
+#set collectors per area and density
+setCond <- function(data){
+  
+  data$C <- 25 #g/cm^3 set particle concentration in fluid
+
+  data$area <- (100*100) #cm^2 set plot area
+  
+  data$n_c <- data$c_density/data$area # number of collecters/m^2
+  data$rho_w <- data$f_density #density of fluid (g/cm^3)
+  data$rho_p <- data$p_density #density of particle (g/cm^3)
+
+  return(data)
+}
+
+#Set environmental conditions for data sets
+
+mudd_data <- setCond(mudd_data)
+
+data_10 <- setCond(data_10)
+data_40 <- setCond(data_40)
+data_60 <- setCond(data_60)
+
+debug_dataa <- setCond(debug_dataa)
+debug_datab <- setCond(debug_datab)
+debug_datag <- setCond(debug_datag)
+
+```
+
+
+As per Mudd et al 2010 paper, change in marsh elevation over time is expressed as: 
+
+dsig/dt = Qc/roes + Qs/roes + O - E - Cmp
+
+```{r particle capture equation, include=TRUE, warning=FALSE}
+
+#Set up function for eqn #4 from Mudd et al 2010
+#mass captured = eta * C * velocity * collector diameter * # collectors/area * height 
+
+findQc <- function(data){
+  
+  C <- data$C #concentration in g/cm3
+  eta <- data$predeta #use this for normal predicted eta
+  #eta <- data$predeta10x   #use this for 10x inflated eta
+  u <- data$ave_velocity #velocity in cm/sec
+  d_c <- data$d_c #diameter of collector in cm
+  n_c <- data$n_c #number of collectors per unit test area
+  h <-data$height #submerged height of collector 
+
+  #calculate mass collected over area and time (mg/cm2sec)
+  data$Qc <- eta*C*u*d_c*n_c*h 
+  
+  return(data)
+}
+
+
+```
+
+```{r calculate sedimentation from particle capture}
+
+mudd_data <- findQc(mudd_data)
+
+data_10 <- findQc(data_10)
+data_40 <- findQc(data_40)
+data_60 <- findQc(data_60)
+
+debug_dataa <- findQc(debug_dataa)
+debug_datab <- findQc(debug_datab)
+debug_datag <- findQc(debug_datag)
+
+```
+
+```{r settling equation, include=TRUE, warning=FALSE}
+
+#Working from eqns 9-17 from Mudd et al 2010
+
+#effective settling velocity = settline velocity - upward motion from turbulence 
+
+
+findQs <- function(data){
+  
+  #settling conditions and empirical constants (in meters)
+  A <- 38.0 #from Camenen 2007 for silt (see Mudd table 1)  (dimensionless coefs based on particle material/shape)
+  B <- 3.55 #from Camenen 2007 for silt (see Mudd table 1; called F in Mudd and B in original paper)  
+  m <- 1.12 #from Camenen 2007 for silt (see Mudd table 1)  
+  g <-   980.665  #acceleration due to gravity (cm/sec^2)
+  K_vk <- 0.4 #von Karman constant, assumed
+  alpha_k <- 0.9 #from Nepf 1999
+  alpha_0 <- 11 #from Tanino and Nepf 2008 (see Mudd table 1)
+  area <- data$area #cm^2
+  C <- data$C #concentration in g/cm^3
+  
+  #set up variables
+  s <-  data$p_density/data$f_density  #ratio of particle - water density
+  d_p <- data$d_p_cm #* (1/100) #particle diameter (cm)
+  v <- data$kin_viscosity_cm2 #*(1/(100*100)) #kinematic viscosity (cm^2/sec)
+  a <- data$frontal_area_unit_volume #* (100/1) #frontal area/unit volume (cm^-1)  
+  c_dense <- data$c_density #number of collectors
+  Re <- data$Re_c #Reynolds number
+  d_c <- data$d_c #* (1/100) #diamete collector (cm)
+ # n_c <- data$n_c #number of collectors per unit area
+  u <- data$ave_velocity #* (1/100) #velocity in cm/sec
+  rho_w <- data$rho_w #* (1/(100*100*100)) #density of fluid (g/cm^3)
+ 
+  #Drag coefficient terms; based on oyster low marsh
+  biomass <- data$biomass_gm2 #biomass from fig 3 equations in g/m2
+  mu <- 0.0019
+  beta_phi_beta <- biomass**(0.18+0.53)
+  bigX <- 0.46
+  zeta <- 3.8 
+  alpha <- 0.12
+  beta_phi <- biomass**(0.18)
+  
+  #eqn 16: drag coefficient (C_D) 
+  num = c_dense / area #number of collectors per area
+
+  phi = (num * pi * (d_c)**2)/4  #solid volume fraction (from Tanino and Nepf 2008)
+
+  alpha_1 = 0.46 + (3.8 * phi) # (eqn 13 from Tanino and Nepf 2008)
+  
+  C_D = 2*((alpha_0/Re)+alpha_1) #eqn 16 Mudd
+
+  #C_D <- .2
+  
+  #C_D = ((A/Re)^(1/m)+(B)^(1/m))^m    #camenen 2007
+  
+  #C_D <- 1 + ((10*Re)**(-2/3))   #eqn 6 Tanino and Nepf
+  
+  #Eqn 17: drag coefficient (C_D) 
+  
+  terma <- (alpha_0*v)/(u*mu*beta_phi)
+  termc <- zeta*beta_phi_beta*((alpha*mu*3.14)/4)
+  #C_D <- 2*(terma+bigX+termc)
+
+  
+  #eqn 15: turbulent energy per unit mass of water (k) 
+
+  k = (alpha_k**2)*(u**2)*((C_D*a*d_c)**(2/3))
+  #k <- (u**2)*(a*d_c)*(2/3)
+
+  #eqn 10: settling velocity in turbulence free water
+
+  # w_s <- (v/d_p)*((((1/4)*((A/B)^(2/m)))+((((d_p^3)*4*g*(s-1))/(3*B*(v^2)))^(1/m)))^(1/2)-((1/2)*((A/B)^(1/m))))^m #eqn 10 Mudd 2010 
+
+  term1 <- v/d_p
+  term2 <- ((A/B)**(2/m))/4
+  term3top <- 4*(d_p**3)*g*(s-1) 
+  term3bot <-3*B*(v**2)
+  term3 <- (term3top/term3bot)**(1/m)
+  term4 <- ((A/B)**(1/m))/2
+  
+  w_s <- term1*((term2+term3)**(1/2)-term4)**m
+    
+  #w_s <- (0.0002 * (d_p * 1000000)^1.54)/1000 #eqn 1.4 Christensen 1998
+  
+  w_s <- (g*(s-1)*d_p**2)/(18*v)
+  
+  #eqn 14: calculate shear velocity (u*)
+  u_star = ((0.2 * k)/rho_w)**(1/2)
+
+  #eqn 11: upward velocity 
+
+  w_up = K_vk*u_star 
+
+  #eqn 9: mass settled = effective settling velocity * C
+  
+  w_eff = w_s - w_up  #effecitve settling velocity = settling with no turbulence - upward motion from turbulence 
+  
+  data$C_D <- C_D
+  
+  data$ustar <- u_star
+  
+  data$ws <- w_s 
+  
+  data$wup <- w_up 
+
+  data$weff <- w_eff
+  
+  data$Qs <- w_eff * C #find settling deposit in g/sec*cm^2
+  
+  return(data)
+}
+
+
+#alternate equations tried (and rejected)
+
+```
+
+```{r calcuate sedimentation from settling}
+
+mudd_data <- findQs(mudd_data)
+
+data_10 <- findQs(data_10)
+data_40 <- findQs(data_40)
+data_60 <- findQs(data_60)
+
+debug_dataa <- findQs(debug_dataa)
+debug_datab <- findQs(debug_datab)
+debug_datag <- findQs(debug_datag)
+```
+
+```{r O}
+
+rho_o <- 1.14 * 1000000 #g/m3 from Callaway et atl 1997, density of organic matter in marsh soils
+
+#From Swanson et al 2013
+
+above <- 0.00238 * 100000000/1000 #g/m4year mean value for above ground biomass given in Table 4, based on simulation run using China Camp parameters
+below <- 0.00417 * 100000000/1000 #g/m4year mean value for below ground biomass given in Table 4
+
+M_o <- (above + below) / (1000*365*24*60*60) #rate of above and below ground biomass, then converting from mg/cm4year to g/cm4sec
+
+O <- M_o/rho_o #divide by density of organic material in sediment to get cm/sec
+
+#From Nyman 2006
+#Stable non-fresh water ave
+
+# org_acc <- 506 #g/m2year, given in Nyam Table 1
+# O <- org_acc/(100*100*roe_o*365*24*60*60) #cm/sec
+#similar to Swanson 2013
+
+```
+
+```{r E}
+
+
+
+
+```
+
+```{r cmp eval = FALSE include = FALSE}
+# From Mudd et al 2009
+#Compation of sediment (silt)
+
+CI <- 0.2 #compression index
+sig_0 <- 10^5 #reference stress in Pa
+sig_eff <- 1 #effective stress, is the "bouyant weight of the material" (weight of soil saturated in water - weight of water within soil unit)(dummy value; must replace)
+E_0 <- 0.4 #void ratio
+
+E_s <- E_0 - CI*log(sig_eff/sig_0) #dimensionless void ratio 
+
+#Compation of organic material
+
+CI <- 1.0 #compression index
+sig_0 <- 10^4 #reference stress in Pa
+sig_eff <- 1 #effective stress, is the "bouyant weight of the material" (soil saturated in water - weight of water within soil unit)(dummy value; must replace)
+E_0 <- 0.25 #void ratio
+
+E_org <- E_0 - CI*log(sig_eff/sig_0) #dimensionless void ratio 
+
+
+#getting these values seems complicated (especially bouyant soil weight); might make more sense to ignore compaction on short term
+
+```
+
+```{r Elevation change functions, include=TRUE, warning=FALSE}
+
+
+findElevation <- function(data){
+  
+  data$dzdt <- (data$Qc/data$rho_p) + (data$Qs/data$rho_p) + O - E - Cmp #total instantaneous elevation change
+
+  #Note: next equations are extrapolations of instantaneous elevation change to longer time periods, which may not be reflective of real world conditions
+  data$tidez <- data$dzdt * 60 * 60 * 12.4167 #elevation change over a tide
+
+  data$yearz <- data$dzdt * 60 * 60 * 12 * 365  #elevation change over a year
+  
+  data$tideC <- (data$Qc/data$rho_p) * 60 * 60 *12.4167 #capture over a tide
+  
+  data$tideS <- (data$Qs/data$rho_p) * 60 * 60 *12.4167 # settling over a tide
+  
+  data$tideTotal <- data$tideC + data$tideS
+  
+  data$perQc <- data$Qc/(data$Qc+data$Qs)
+  
+  return(data)
+}
+
+```
+
+```{r calculate elevation change}
+
+mudd_data <- findElevation(mudd_data)
+
+data_10 <- findElevation(data_10)
+data_40 <- findElevation(data_40)
+data_60 <- findElevation(data_60)
+
+debug_dataa <- findElevation(debug_dataa)
+debug_datab <- findElevation(debug_datab)
+debug_datag <- findElevation(debug_datag)
+
+```
+
+```{r recreate mudd 2010}
+
+#Recreate the Mudd 2010 Figure 5 using our formula for eta (instead of original Palmer 2004 eqn)
+
+
+#Create new columns with units matching the original figure
+
+muddData$d_p_um <- mudd_data$d_p_cm * 10000
+
+muddData$velocity_m <- mudd_data$ave_velocity / 100
+
+#isolate test sites
+
+goat <- muddData %>%
+  filter(d_c < 0.49 & p_density == 2.65)
+
+oyster <- muddData %>%
+  filter(d_c > 0.64 & p_density == 2.65) 
+
+#set up expressions
+xtext <- expression(paste("flow velocity (",paste(italic("u"))," in m/sec)"))
+ytext <- expression(paste("particle  diameter (", "d"["p"] ~ "in " , paste(mu), "m)"))
+
+goatsub <- expression(paste("Goat Island high marsh, ", italic(h), " = 0.1 m, ", italic(B), "= 1000 g/", m^2))
+oystersub <- expression(paste("Oyster Landing low marsh, ", italic(h), " = 0.1 m, ", italic(B), "= 1000 g/", m^2))
+
+png("graphics/mudd10xeta.png")
+
+giplot <- ggplot(goat, aes(x = velocity_m, y = d_p_um, z = perQc)) + 
+  geom_contour(aes(color = ..level..), bins = 25) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 1), panel.border = element_rect(colour = "black", fill=NA, size=2)) +
+  labs(title = "Fraction of sediment flux due to capture: Qc/(Qc + Qs)", subtitle = goatsub,  
+       y = ytext, x = xtext) + 
+  scale_color_viridis_c(name = "Qc", limits = c(0, .70), direction = 1, option = "D")  
+
+
+olplot <- ggplot(oyster, aes(x = velocity_m, y = d_p_um, z = perQc)) + 
+  geom_contour(aes(color = ..level..), bins = 25) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_classic() + 
+  theme(plot.subtitle = element_text(hjust = 1), panel.border = element_rect(colour = "black", fill=NA, size=2)) +
+  labs(subtitle = oystersub, 
+       y = ytext, x = xtext) + 
+  scale_color_viridis_c(name = "Qc", limits = c(0, .70), direction = 1, option = "D") 
+
+ggarrange(giplot, olplot, ncol = 1, common.legend = TRUE)
+
+dev.off()
+
+```
+
+```{r check Qc% of design plot}
+
+#Recreate the Mudd 2010 Figure 5 using our formula for eta (instead of original Palmer 2004 eqn)
+
+#set up expressions
+xtext <- expression(paste("flow velocity (",paste(italic("u"))," in m/sec)"))
+ytext <- expression(paste("particle  diameter (", "d"["p"] ~ "in " , paste(mu), "m)"))
+
+
+data10perC <- ggplot(data_10, aes(x = ave_velocity, y = frontal_area_unit_volume, z = perQc)) + 
+  geom_contour(aes(color = ..level..), bins = 25) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_pubclean() +
+  labs(x = "", y = "10 um") +
+  theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 1), panel.border = element_rect(colour = "black", fill=NA, size=2)) +
+  scale_color_viridis_c(name = "Qc%", direction = 1, option = "D")  
+
+data40perC <- ggplot(data_40, aes(x = ave_velocity, y = frontal_area_unit_volume, z = perQc)) + 
+  geom_contour(aes(color = ..level..), bins = 25) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_pubclean() +
+  labs(x = "", y = "40 um") +
+  theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 1), panel.border = element_rect(colour = "black", fill=NA, size=2)) +
+  scale_color_viridis_c(name = "Qc%", direction = 1, option = "D")  
+
+data60perC <- ggplot(data_60, aes(x = ave_velocity, y = frontal_area_unit_volume, z = perQc)) + 
+  geom_contour(aes(color = ..level..), bins = 25) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_pubclean() +
+  labs(x = "", y = "60 um") +
+  theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 1), panel.border = element_rect(colour = "black", fill=NA, size=2)) +
+  scale_color_viridis_c(name = "Qc%", direction = 1, option = "D")  
+
+check_perC <- ggarrange(data10perC, data40perC, data60perC, common.legend = TRUE, ncol = 1)
+
+ggsave(file = "graphics/designdataperC.png", plot = check_perC)
+
+```
+
+```{r wetland deign plots}
+
+xtext <- expression(paste("flow velocity (",paste(italic("u"))," in cm/sec)"))
+ytext <- expression(paste("frontal area/unit volume  (", paste(italic(   a))," in ", paste("cm"^"-1"), ")"))
+
+#Particle size 10um
+
+suba10 <- expression(paste("Particle Diameter = 10", paste(mu), paste("m")))
+
+a10 <- ggplot(data_10, aes(x = ave_velocity, y = frontal_area_unit_volume, z = tideC)) + 
+  geom_contour(aes(color = ..level..), bins = 15) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_pubclean() +  
+  theme(axis.title.x = element_blank()) +
+  labs(y = "Capture") +
+  scale_color_viridis_c(name = "Sedimentation (cm/tide)   ", direction = 1, option = "C", limits = c(0, 0.0005), breaks = c(0,0.0005))
+
+b10 <- ggplot(data_10, aes(x = ave_velocity, y = frontal_area_unit_volume, z = tideS)) + 
+  geom_contour(aes(color = ..level..), bins = 8) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_pubclean() + 
+  theme(axis.title.x = element_blank()) +
+  labs(y = "Settling") +
+  scale_color_viridis_c(name = "Sedimentation (cm/tide)", direction = 1, option = "C", limits = c(0, 0.0005), breaks = c(0,0.0005)) 
+
+c10 <- ggplot(data_10, aes(x = ave_velocity, y = frontal_area_unit_volume, z = tideTotal)) + 
+  geom_contour(aes(color = ..level..), bins = 15) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_pubclean() + 
+  theme(axis.title.x = element_blank()) +
+  labs(y = "Total") +
+  scale_color_viridis_c(name = "Sedimentation (cm/tide)", direction = 1, option = "C", limits = c(0, 0.0005), breaks = c(0,0.0005)) 
+
+plot10 <- ggarrange(a10, b10, c10, ncol = 1, common.legend = TRUE, legend = "top")
+    
+fig10 <- ggpar(plot10, family = "arial")
+
+annfig10 <- annotate_figure(fig10, top = text_grob(suba10), left = text_grob(ytext, rot=90), bottom = text_grob(xtext))
+
+ggsave(file = "graphics/sed10um.png", plot = annfig10)
+
+#Particle size 40 um
+
+sub40a <- expression(paste("Particle Diameter = 40", paste(mu), paste("m")))  
+
+a40 <- ggplot(data_40, aes(x = ave_velocity, y = frontal_area_unit_volume, z = tideC)) + 
+  geom_contour(aes(color = ..level..), bins = 15) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_pubclean() + 
+  theme(axis.title.x = element_blank()) +
+  labs(y = "Capture") +
+  scale_color_viridis_c(name = "Sedimentation (cm/tide)",limits = c(0,0.006), direction = 1, option = "C", breaks = c(0,0.006,0.01)) 
+
+b40 <- ggplot(data_40, aes(x = ave_velocity, y = frontal_area_unit_volume, z = tideS)) + 
+  geom_contour(aes(color = ..level..), bins = 8) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_pubclean() + 
+  theme(axis.title.x = element_blank()) +
+  labs(y = "Settling") +
+  scale_color_viridis_c(limits = c(0,0.006), direction = 1, option = "C", aesthetics = "colour", breaks = c(0,0.006,0.01)) 
+
+c40 <- ggplot(data_40, aes(x = ave_velocity, y = frontal_area_unit_volume, z = tideTotal)) + 
+  geom_contour(aes(color = ..level..), bins = 15) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_pubclean() + 
+  theme(axis.title.x = element_blank()) +
+  labs(y = "Total") +
+  scale_color_viridis_c(limits = c(0,0.006), direction = 1, option = "C", aesthetics = "colour", breaks = c(0,0.006,0.01)) 
+
+plot40 <- ggarrange(a40, b40, c40, ncol = 1, common.legend = TRUE, legend = "top")
+    
+fig40 <- ggpar(plot40, family = "arial")
+
+annfig40 <- annotate_figure(fig40, top = text_grob(sub40a), left = text_grob(ytext, rot=90), bottom = text_grob(xtext))
+
+ggsave(file = "graphics/sed40um.png", plot = annfig40)
+
+#Particle size 60 um
+
+sub60a <- expression(paste("Particle Diameter = 60", paste(mu), paste("m"))) 
+
+a60 <- ggplot(data_60, aes(x = ave_velocity, y = frontal_area_unit_volume, z = tideC)) + 
+  #geom_contour_filled(bins = 10) +
+  geom_contour(aes(color = ..level..), bins = 15) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_pubclean() + 
+  theme(axis.title.x = element_blank()) +
+  labs(y = "Capture") +
+  scale_color_viridis_c(name = "Sedimentation (cm/tide)", limits = c(0, 0.0125), direction = 1, option = "C", breaks = c(0,0.0125))  
+
+b60 <- ggplot(data_60, aes(x = ave_velocity, y = frontal_area_unit_volume, z = tideS)) + 
+ # geom_contour_filled(bins = 10) +
+  geom_contour(aes(color = ..level..), bins = 8) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_pubclean() + 
+  theme(axis.title.x = element_blank()) +
+  labs(y = "Settling") +
+  scale_color_viridis_c(name = "Sedimentation (cm/tide)", limits = c(0, 0.0125), direction = 1, option = "C", breaks = c(0, 0.0125)) 
+
+c60 <- ggplot(data_60, aes(x = ave_velocity, y = frontal_area_unit_volume, z = tideTotal)) + 
+  #geom_contour_filled(bins = 10) +
+  geom_contour(aes(color = ..level..), bins = 15) +
+  geom_label_contour(skip = 0, rotate = FALSE) +
+  theme_pubclean() + 
+  theme(axis.title.x = element_blank()) +
+  labs(y = "Total") +
+  scale_color_viridis_c(name = "Sedimentation (cm/tide)", limits = c(0, 0.0125), direction = 1, option = "C", breaks = c(0, 0.0125)) 
+
+plot60 <- ggarrange(a60, b60, c60, ncol = 1, common.legend = TRUE, legend = "top")
+    
+fig60 <- ggpar(plot60, family = "arial")
+
+annfig60 <- annotate_figure(fig60, top = text_grob(sub60a), left = text_grob(ytext, rot=90), bottom = text_grob(xtext))
+
+ggsave(file = "graphics/sed60um.png", plot = annfig60)
+
+```
+
+```{r debug elevation data issues}
+
+da <- ggplot(debug_datab) + geom_line(aes(x = frontal_area_unit_volume, y = tideC)) +
+  theme_pubclean() 
+
+db <- ggplot(debug_datab) + geom_line(aes(x = frontal_area_unit_volume, y = tideS)) +
+  theme_pubclean() 
+
+dc <- ggplot(debug_datab) + geom_line(aes(x = frontal_area_unit_volume, y = tidez)) +
+  theme_pubclean() 
+
+dd <- ggplot(debug_datag) + geom_line(aes(x = ave_velocity, y = tideC)) +
+  theme_pubclean() 
+
+de <- ggplot(debug_datag) + geom_line(aes(x = ave_velocity, y = tideS)) +
+  theme_pubclean() 
+
+df <- ggplot(debug_datag) + geom_line(aes(x = ave_velocity, y = tidez)) +
+  theme_pubclean() 
+
+
+ggarrange(da, dd, db, de, dc, df, ncol = 2, nrow = 3)
+
+
+ # scale_color_viridis_c(limits = c(0.01, 0.07), breaks = c(0.01, 0.07))
+
+ggplot(debug_dataa, aes(x = ave_velocity, y = frontal_area_unit_volume, color = tidez)) + 
+  geom_point(size = 15, shape = "square") +
+  theme_pubclean() + 
+  theme(axis.title.x = element_blank(), 
+        legend.key = element_blank()) +
+  labs(y = "Frontal Area/Unit Volume", x = "Velocity") 
+ # scale_color_viridis_c(name = "Sedimentation (cm/tide)", limits = c(0, 1.25), direction = 1, option = "C", breaks = c(0, 0.125)) 
+
+ggplot(debug_dataa, aes(x = ave_velocity, y = frontal_area_unit_volume, z = dzdt)) + 
+  geom_contour(aes(color = ..level..)) +
+  theme_pubclean() + 
+  theme(axis.title.x = element_blank(), 
+        legend.key = element_blank()) +
+  labs(y = "Frontal Area/Unit Volume", x = "Velocity") +
+  scale_color_viridis_c(name = "Sedimentation (m/sec)", limits = c(0.01, 0.02), direction = 1, option = "C", breaks = c(0.01, 0.02))
+
+```
+
+```{r export data}
+
+cleantestdata <- testdata %>%
+  dplyr::select("run_ID", "Re_c", "frontal_area_unit_volume", "height", "d_c", "d_p", "radius_ratio", 
+                "ave_velocity", "kin_viscosity_cm2", "f_density", "p_density", "c_density", 
+                "L", "J", "logX1", "logX2", "logX3", "logX4", "logX5","predlogeta", "predeta")
+  
+write.csv(cleantestdata, file = "data/predicted_model_output.csv")
+
+
+```
+
+```{r compare to Wax Lake data}
+#Comparing model training data & model eta values to numbers from Sheila's model
+
+lambda <- .0003 #portion of particles intercepted in veg per second
+l_wl <- 718 #cm length of flume between sediment introduction and flouresence sampler (where SSC is estimated)
+v_wl <- 2.29 #cm/s, current estimation of velocity (will change with updated data from Tu)
+
+eta_wl <- (lambda*l_wl)/v_wl #around 9%, which is very very high compared to most eta values
+#Min-max eta values from training data: 7.3e-5 to 6.9e-3
+#Follow up from convo wth Sheila: shape of wetland veg (v dense elephant ear plants with lots of extant biofilm) might account for these differences (ie .09 is potentially reasonable)
+
+#Write output file
+field_data <- testdata %>%
+  dplyr::select("run_ID", "paper", "eta", "Re_c", "frontal_area_unit_volume", "height", "d_c", "d_p", "radius_ratio", 
+                "ave_velocity", "kin_viscosity_cm2", "f_density", "p_density", "c_density", 
+                "L", "J", "logX1", "logX2", "logX3", "logX4", "logX5","predlogeta", "predeta")
+  
+write.csv(field_data, file = "data/field_flume_output_alt_32.csv")
+
+
+```
+

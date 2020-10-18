@@ -5,12 +5,15 @@ date: "11/19/2019"
 output: html_document
 ---
 
-
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
+# remove.packages("tidyselect")
+# install.packages("tidyselect")
+
+library(tibble)
 library(tidyverse)
+library(ggplot2)
 library(kableExtra)
 library(GGally)
 library(ggpubr)
@@ -22,23 +25,26 @@ library(grDevices)
 library(pals)
 library(MASS)
 library(caret)
+library(moderndive)
+library(MuMIn)
+library(segmented)
+library(stats)
+library(pracma)
 
 ```
 
 ```{r data import, include=TRUE, warning=FALSE}
 
 #import data
-#flume_data_test <- read_csv("data/flume_data_test.csv") 
 data <- read_csv("data/flume_review_data.csv")
 
 ```
 
-
 ```{r data cleaning, include=TRUE, warning=FALSE}
 
 data <- data %>%
-  filter(!(is.na(eta))) #only include runs with eta values
-
+  filter(!(is.na(eta))) %>% #only include runs with eta values
+  filter(c_density > 1) #Not including single collector studies
   
 #Convert from character to numeric
 data$Re_c <- as.numeric(data$Re_c)
@@ -53,33 +59,50 @@ data <- data %>%
   
 ```
 
-
 ```{r aggregate and log terms, include=TRUE, warning=FALSE}
 
 #Aggregate variables until each exponent has one associated variable
 
-#j value = third term associated with c2 (c7 in laurel's original propsal)
+#trying new c1 term (K), replacing solo Re number
 
+findK <- function(Re, #Reynolds number
+                  a, #frontal area per unit volume
+                  h, #height of emergent veg (water height)
+                  d #collector diameter
+  
+){
+  
+  K <- Re/((a*h*(1-(a*d)))^(1/2))
+  
+  return(K)
+}
+
+
+
+#j value = term associated with c2 (c7 in laurel's original propsal)
+
+#simple ad version of term
 findJ <- function(a, #frontal area per unit volume
                   d #collector diameter
 ){
-  
+
   J <- a*d
-  
+
   return(J)
 }
 
+
 ######DROPPED FROM MODEL
-# P value = ratio of particle density to water density
-# Associated with term c3
-# findP <- function(part_dense, #particle density in g/cm^3
-#                   fluid_dense #fluid density in g/cm^3
-# ){
-# 
-#   P <- part_dense/fluid_dense
-# 
-#   return(P)
-# }
+#P value = ratio of particle density to water density
+#Associated with term c3
+findP <- function(part_dense, #particle density in g/cm^3
+                  fluid_dense #fluid density in g/cm^3
+){
+
+  P <- part_dense/fluid_dense
+
+  return(P)
+}
 ######DROPPED FROM MODEL
 
 #L value = [(U*a^1/3*d^4/3)/mu]
@@ -100,6 +123,7 @@ findL <- function(U, #Average velocity of fluid
 #calculate aggregate terms
 
 data <- data %>%
+  mutate(K = findK(Re = Re_c, a = frontal_area_unit_volume, h = height, d = d_c)) %>%
   mutate(J = findJ(a = frontal_area_unit_volume, d = d_c)) %>%
   mutate(P = findP(part_dense = p_density, fluid_dense = f_density)) %>%
   mutate(L = findL(U=ave_velocity_cm, a = frontal_area_unit_volume, d_c = d_c, mu=kin_viscosity_cm2))
@@ -107,9 +131,10 @@ data <- data %>%
 #log terms for later linear model fit
 
 logdata <- data %>%
-  mutate(logX1 = log(Re_c)) %>%
+  mutate(logX1 = log(K)) %>%
+#  mutate(logX1 = log(Re_c)) %>%
   mutate(logX2 = log(J)) %>%
- # mutate(logX3 = log(P)) %>%
+  mutate(logX3 = log(P)) %>%
   mutate(logX4 = log(radius_ratio)) %>%
   mutate(logX5 = log(L)) %>%
   mutate(logY = log(eta))
@@ -118,31 +143,15 @@ logdata <- data %>%
 biofilm <- logdata %>%
   filter(biofilm == "yes")
 
-#Filter the 50-500 range for Palmer 2004 comparison later
-Re_Palmer <- logdata %>%
-  filter(Re_c >= 50) %>%
-  filter(Re_c <= 500)
-
 #Split into Re regime  
 
 Re1 <- logdata %>%
-  filter(Re_c <= 40)
+  filter(Re_c <= 194)
 
 Re2 <- logdata %>%
-  filter(Re_c > 40)
-
-#Just single-collector runs
-
-single <- logdata %>%
-  filter(c_density == 1) 
-
-#Just multi-collector runs
-
-multi <- logdata %>%
-  filter(!(c_density ==1))
+  filter(Re_c > 194)
 
 ```
-
 
 ```{r fit linear model with lm, include=TRUE}
 
@@ -156,11 +165,11 @@ findLogFit <- function(logdata){
   logY <- logdata$logY
   logX1 <- logdata$logX1
   logX2 <- logdata$logX2
- # logX3 <- logdata$logX3
+  logX3 <- logdata$logX3
   logX4 <- logdata$logX4
   logX5 <- logdata$logX5
 
-  linear_mod <- lm(logY ~ logX1 + logX2 + logX4 + logX5)
+  linear_mod <- lm(logY ~ logX1 + logX2 + logX3 + logX4 + logX5)
 
   return(linear_mod)
 
@@ -170,11 +179,13 @@ findLogFit <- function(logdata){
 
 total_lm <- findLogFit(logdata = logdata)
 biofilm_lm <- findLogFit(logdata = biofilm)
-single_lm <- findLogFit(logdata = single)
-multi_lm <- findLogFit(logdata = multi)
 Re1_lm <- findLogFit(logdata = Re1)
 Re2_lm <- findLogFit(logdata = Re2)
-palmer_lm <- findLogFit(logdata = Re_Palmer)
+
+#Alternate models with dropped terms
+
+noc1_lm <- lm(logY ~ logX2 + logX3 + logX4 + logX5, logdata)
+noc5_lm <- lm(logY ~ logX1 + logX2 + logX3 + logX4, logdata)
 
 #pulling out R2 values for plotting bootstrap CI later
 total_R2 <- summary(total_lm)$r.square 
@@ -182,11 +193,87 @@ bio_R2 <- summary(biofilm_lm)$r.square
 re1_R2 <- summary(Re1_lm)$r.square
 re2_R2 <- summary(Re2_lm)$r.square
 
+noc1_R2 <- summary(noc1_lm)$r.square
+noc5_R2 <- summary(noc5_lm)$r.square
+
+```
+
+```{r total least squares regression}
+#set up data into data frame and vector format for later function
+
+y_vector <- logdata$logY
+x_matrix <- cbind(logdata$logX1, logdata$logX2, logdata$logX3, logdata$logX4, logdata$logX5)
+
+
+re1_vector <- Re1$logY
+re1_matrix <- cbind(Re1$logX1, Re1$logX2, Re1$logX3, Re1$logX4, Re1$logX5)
+
+re2_vector <- Re2$logY
+re2_matrix <- cbind(Re2$logX1, Re2$logX2, Re2$logX3, Re2$logX4, Re2$logX5)
+
+#Use odregress function
+tls_output<- odregress(x_matrix, y_vector)
+tls_output_re1 <- odregress(re1_matrix, re1_vector)
+tls_output_re2 <- odregress(re2_matrix, re2_vector)
+
+#Does not return lm form; create dummy lm model and replace coefs, residuals, etc
+
+tls_total <- lm(logY ~ logX1 + logX2 + logX3 + logX4 + logX5, data = logdata) #set dummy
+
+
+tls_total$coefficients <- tls_output$coeff #replace coefs
+tls_total$residuals <- tls_output$resid #replace residuals
+tls_total$fitted.values <- tls_output$fitted #replace fitted log eta values
+logdata$predlogtls <- tls_total$fitted.values #add fitted values to pred eta
+
+tls_re1 <- lm(logY ~ logX1 + logX2 + logX3 + logX4 + logX5, data = Re1) #set dummy
+
+tls_re1$coefficients <- tls_output_re1$coeff #replace coefs
+tls_re1$residuals <- tls_output_re1$resid #replace residuals
+tls_re1$fitted.values <- tls_output_re1$fitted #replace fitted log eta values
+Re1$predlogtls <- tls_re1$fitted.values #add fitted values to pred eta
+
+tls_re2 <- lm(logY ~ logX1 + logX2 + logX3 + logX4 + logX5, data = Re2) #set dummy
+
+tls_re2$coefficients <- tls_output_re2$coeff #replace coefs
+tls_re2$residuals <- tls_output_re2$resid #replace residuals
+tls_re2$fitted.values <- tls_output_re2$fitted #replace fitted log eta values
+Re2$predlogtls <- tls_re2$fitted.values #add fitted values to pred eta
+
+#Compare to OLS
+mean(total_lm$residuals)
+mean(Re1_lm$residuals)
+mean(Re2_lm$residuals)
+
+mean(tls_total$residuals)
+mean(tls_re1$residuals)
+mean(tls_re2$residuals)
+
+#Compare AICc scores
+AICc(total_lm)
+AICc(Re1_lm)
+AICc(Re2_lm)
+
+AICc(tls_total)
+AICc(tls_re1)
+AICc(tls_re2)
+
+#Visual evaluation 
+png("graphics/tls.png")
+ggplot(logdata, aes(x = logY, y = predlogtls)) + 
+  geom_smooth(method = "lm", color = "black") +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
+  theme_minimal() + 
+  labs(title = "All Runs", y = "predicted eta", x = "observed eta") +
+  # geom_text(x = -8, y = -5, label = lm_eqn(logdata), parse = TRUE, size = 5) +
+  scale_color_viridis_c(option = "C", direction = -1)
+dev.off()
+
+#Higher residuals and AICc for total model and both split models; keep using OLS model
+
 ```
 
 ```{r fit linear model with caret, include=TRUE}
-
-
 #Write function to find linear fit
 
 control <- trainControl(method= "cv", number = 5) #5 fold cross validation
@@ -200,11 +287,12 @@ findLogFit2 <- function(logdata){
   logY <- logdata$logY
   logX1 <- logdata$logX1
   logX2 <- logdata$logX2
- # logX3 <- logdata$logX3
+  logX3 <- logdata$logX3
   logX4 <- logdata$logX4
   logX5 <- logdata$logX5
 
-  linear_mod <- train(logY ~ logX1 + logX2 + logX4 + logX5, logdata, method = "lm", trControl = control)
+  #linear_mod <- lm(logY ~ logX1 + logX2 + logX4 + logX5)
+  linear_mod <- train(logY ~ logX1 + logX2 + logX3 + logX4 + logX5, logdata, method = "lm", trControl = control)
 
   return(linear_mod)
 
@@ -214,9 +302,9 @@ findLogFit2 <- function(logdata){
 
 set.seed(12345)
 
+
 total_lm2 <- findLogFit2(logdata = logdata)
 biofilm_lm2 <- findLogFit2(logdata = biofilm)
-palmer_lm2 <- findLogFit2(logdata = Re_Palmer)
 Re1_lm2 <- findLogFit2(logdata = Re1)
 Re2_lm2 <- findLogFit2(logdata = Re2)
 
@@ -233,43 +321,200 @@ biofilm_lm2_final <- biofilm_lm2$finalModel
 # re4_R2 <- summary(Re4_lm)$r.square
 ```
 
+```{r fit linear model with LASSO, include=TRUE}
+
+#Fit with LASSO (alpha = 1) and small lambda (sensitivity to inclusion of variables)
+
+set.seed(12345)
+
+lasso_lm <-train(logY ~ logX1 + logX2 + logX3 + logX4,
+                 data = logdata,
+                 method = 'glmnet', 
+                 tuneGrid = expand.grid(alpha = 1, lambda = .01)) 
+
+
+as.data.frame.matrix(coef(lasso_lm$finalModel, lasso_lm$bestTune$lambda)) #Check coefficients
+
+#AICc(lasso_lm$finalModel)
+#AICc function not equipped to handle glmnet functions; must copy paste coefs into dummy lm to get AICc score
+
+logdata$lassologeta <- lasso_lm %>% predict(logdata)
+
+ggplot(logdata, aes(x = logY, y = lassologeta)) + 
+  geom_smooth(method = "lm", color = "black") +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
+  theme_minimal() + 
+  labs(title = "", y = "predicted ln(eta) [LASSO]", x = "observed ln(eta)") +
+  geom_text(x = -8, y = -5, label = "R2 = 0.80936", parse = FALSE, size = 5) +
+  scale_color_viridis_c(option = "C", direction = -1)
+
+#Not hugely different from other lm training attempt, and with slightly lower R2 
+
+```
+
 ```{r fit stepwise model with stepAIC}
 #Using a stepwise model selector based on AIC 
 #Input is the linear model (w/ all parameters) derived above 
 #k - degrees of freedom for penalty (2 for true AIC); direction - both (try adding and substracting terms)
 AIC_all <- stepAIC(total_lm, direction = "both", k = 2)
 AIC_bio <- stepAIC(biofilm_lm, direction = "both", k = 2)
-AIC_palm <- stepAIC(palmer_lm, direction = "both", k = 2)
-AIC_Re1 <- stepAIC(Re1_lm, direction = "both", k = 2)
-AIC_Re2 <- stepAIC(Re2_lm, direction = "both", k = 2)
+AIC_re1 <- stepAIC(Re1_lm, direction = "both", k = 2)
+AIC_re2 <- stepAIC(Re2_lm, direction = "both", k = 2)
+AIC_noc1 <- stepAIC(noc1_lm, direction = "both", k = 2)
+AIC_noc5 <- stepAIC(noc5_lm, direction = "both", k =2)
 
-extractAIC(Re1_lm) 
-extractAIC(AIC_Re1) #Stepwise dropped 2 components from Re1 model, improved AIC score
-summary(AIC_palm)
+#extact AIC scores for stepwise fitting models
 
+extractAIC(AIC_all)
+extractAIC(AIC_re1)
+extractAIC(AIC_re2) #As of 8/27, only including X2 (ad) and X4 (R*). This seems off- Re is likely important enough to include? Re-run with new ESDL values
+summary(AIC_all)
+summary(AIC_re1)
+summary(AIC_re2)
+
+#Extract AICc scores 
+
+AICc(AIC_all) #139 vs #175 
+AICc(AIC_re1) #24 vs 24 | 102
+AICc(AIC_re2) #112 vs 110 | 48
+AICc(total_lm) #142 vs 177
+AICc(Re1_lm) #26 vs 24 |
+AICc(Re2_lm) #114 vs 113 | 
+
+AICc(noc1_lm)
+AICc(noc5_lm)
 ```
 
 ```{r fit stepwise model with train}
 #trying to use the caret package for stepwise model fitting
 
-sub_Re1 <- Re1 %>% #creating subset of just logX1-5 for function below
-  dplyr::select(logX1, logX2, logX4, logX5)
-eta_Re1 <- Re1$logY #just logged eta values
+sub <- logdata %>% #creating subset of just logX1-5 for function below
+  dplyr::select(logX1, logX2, logX3, logX4)
+eta <- logdata$logY #just logged eta values
 
-control <- trainControl(method = "cv", number = 10) #this controls the settings for the model selection (10-fold cross validation currently)
+control <- trainControl(method = "cv", number = 5) #this controls the settings for the model selection (10-fold cross validation currently)
 
-train_Re1 <- train(x = sub_Re1, 
-                   y = eta_Re1, 
-                   form = Re1_lm, 
-                   data = logdata,
+train_step <- train(x = sub, 
+                   y = eta, 
+                   form = noc5_lm, 
+                  # data = logdata,
                    method = "leapSeq", #stepwise version of function
                    tuneGrid = data.frame(nvmax = 1:5),
                    trControl = control) #using settings from above
 
-train_Re1$results #Check results (select smallest RMSE and highest R2)
+train_step$results #Check results (select smallest RMSE and highest R2)
+
+cv_lm <- train_step$finalModel
 
 ```
 
+```{r segmented regression}
+#find optimal breakpoints in Re
+
+#npsi = number of breakpoints to locate; if left undeclared the model will default to number of variables selected
+#jumps between 0.9885 and 5.269 as selected breakpoints; choosing 2 breakpoints results in no breakpoints found
+segmented(noc5_lm, seg.Z =~logX1) #, npsi = 1)
+
+
+exp(0.9885) #Re breakpoint: 2.687
+exp(5.269) #194
+```
+
+```{r standardized coefs}
+#Finding standardized ("beta") coefs to compare influence of each term 
+
+#Pre-proccess data to center and scale (to find the standardized coefs)
+stanData <- data.frame("logX1" = logdata$logX1, 
+                       "logX2" = logdata$logX2,
+                       "logX3" = logdata$logX3,
+                       "logX4" = logdata$logX4, 
+                       "logX5" = logdata$logX5, 
+                       "logY" = logdata$logY)
+
+stanData <- scale(stanData) %>%
+  data.frame()
+
+
+total_lm_stan <-  lm(data = stanData, logY ~ logX1 + logX2 + logX4 + logX5)
+standard_coefs <- total_lm_stan$coefficients
+#X4 the least dominant term; X5 strong negative and X1 strong positive (pre 8/27)
+#as of 8/27, X1 and X5 most dominant; X3 least
+
+#Look at standardized data from Re regime split models
+
+# stanData1 <- data.frame("logX1" = Re1$logX1, 
+#                         "logX2" = Re1$logX2,
+#                         "logX3" = Re1$logX3,
+#                         "logX4" = Re1$logX4, 
+#                         "logX5" = Re1$logX5, 
+#                         "logY" =  Re1$logY)
+# 
+# stanData1 <- scale(stanData1) %>%
+#   data.frame()
+# 
+# 
+# Re1_lm_stan <-  lm(data = stanData1, logY ~ logX1 + logX2 + logX4 + logX5)
+# standard_coefs1 <- Re1_lm_stan$coefficients
+# 
+# 
+# stanData2 <- data.frame("logX1" = Re2$logX1, 
+#                         "logX2" = Re2$logX2,
+#                         "logX3" = Re2$logX3,
+#                         "logX4" = Re2$logX4, 
+#                         "logX5" = Re2$logX5, 
+#                         "logY" =  Re2$logY)
+# 
+# stanData2 <- scale(stanData2) %>%
+#   data.frame()
+# 
+# 
+# Re2_lm_stan <-  lm(data = stanData2, logY ~ logX1 + logX2 + logX3 + logX5)
+# standard_coefs2 <- Re2_lm_stan$coefficients
+# 
+# rbind(standard_coefs, standard_coefs1, standard_coefs2)
+
+#No c5 term model
+
+stanDataNoc5 <- data.frame("logX1" = logdata$logX1, 
+                           "logX2" = logdata$logX2,
+                           "logX3" = logdata$logX3,
+                           "logX4" = logdata$logX4, 
+                           "logY" =  logdata$logY)
+
+stanDataNoc5 <- scale(stanDataNoc5) %>%
+  data.frame()
+
+
+noc5_lm_stan <-  lm(data = stanDataNoc5, logY ~ logX1 + logX2 + logX3 + logX4)
+standard_coefs_noc5 <- noc5_lm_stan$coefficients
+
+#5 fold CV model
+
+stansub <- stanData %>% #creating subset of just logX1-5 for function below
+  dplyr::select(logX1, logX2, logX3, logX4)
+staneta <- stanData$logY #just logged eta values
+
+control <- trainControl(method = "cv", number = 5) #this controls the settings for the model selection (10-fold cross validation currently)
+
+stan_step <- train(x = stansub, 
+                   y = staneta, 
+                   form = noc5_lm_stan, 
+                  # data = logdata,
+                   method = "leapSeq", #stepwise version of function
+                   tuneGrid = data.frame(nvmax = 1:5),
+                   trControl = control) #using settings from above
+
+stan_step$results #Check results (select smallest RMSE and highest R2)
+
+stancv_lm <- stan_step$finalModel
+
+str(stancv_lm)
+
+stancv_lm$param
+
+
+
+```
 
 ```{r setup eqn for plots, include=TRUE, eval=FALSE}
 
@@ -277,12 +522,12 @@ train_Re1$results #Check results (select smallest RMSE and highest R2)
 #Could also be tweaked to return the model (this would be redundant to code in the above chunk)
 
 lm_eqn <- function(data){
-    m <- lm(data$logY ~ data$logX1 + data$logX2 + data$logX4 + data$logX5)
+    m <- lm(data$logY ~ data$logX1 + data$logX2 + data$logX3 + data$logX4)
     eq <- substitute(~~italic(r)^2~"="~r2, #italic(logY == int + c1*logX1 + c2*logX2 + c4*logX4 + c5*logX5) *","
          list(int = format(unname(coef(m)[1]), digits = 2),
               c1 = format(unname(coef(m)[2]), digits = 2),
               c2 = format(unname(coef(m)[3]), digits = 2),
-          #    c3 = format(unname(coef(m)[4]), digits = 2),
+              c3 = format(unname(coef(m)[4]), digits = 2),
               c4 = format(unname(coef(m)[5]), digits = 2),
               c5 = format(unname(coef(m)[6]), digits = 2),
               r2 = format(summary(m)$r.squared, digits = 3)))
@@ -291,7 +536,6 @@ lm_eqn <- function(data){
 
 
 ```
-
 
 ```{r setup eqn for plots with train, include=TRUE, eval=FALSE}
 
@@ -314,18 +558,22 @@ lm_eqn2 <- function(data, control){
 
 ```
 
-
 ```{r check linear function fit 1, include=TRUE, fig.width= 4}
+#Text for plots
+xlablog = expression(paste("observed ln(", eta, ")"))
+ylablog = expression(paste("predicted ln(",  eta, ")"))
 
-#Predict values for entire data set
+#Predict values for entire data set 
 logdata$predlogeta <- predict(total_lm)
+logdata$predeta <- exp(logdata$predlogeta)
 all <- ggplot(logdata, aes(x = logY, y = predlogeta)) + 
   geom_smooth(method = "lm", color = "black") +
   geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
-  theme_minimal() + 
-  labs(title = "All Runs (particle density)", y = "predicted log(eta)", x = "observed log(eta)") +
+  theme_pubclean() + 
+  theme(legend.position = "right") + 
+  labs(y = ylablog, x = xlablog) +
   geom_text(x = -8, y = -5, label = lm_eqn(logdata), parse = TRUE, size = 5) +
-  scale_color_viridis_c(option = "plasma")
+  scale_color_viridis_c(option = "C", direction = -1)
   
 #Predict for runs with biofilm presence 
 biofilm$predlogeta <- predict(biofilm_lm)
@@ -336,60 +584,53 @@ bio <- ggplot(biofilm, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm
   geom_text(x = -8, y = -2, label = lm_eqn(biofilm), parse = TRUE, size = 5) +
   scale_color_viridis_c(option = "plasma")
 
-#Predict for single collector studies
-single$predlogeta <- predict(single_lm)
-sing <- ggplot(single, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
-  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
-  theme_minimal() + 
-  labs(title = "Single Collector Studies", y = "predicted log(eta)", x = "observed log(eta)") +
-  geom_text(x = -8, y = -5, label = lm_eqn(biofilm), parse = TRUE, size = 5) +
-  scale_color_viridis_c(option = "plasma")
-
-
-#Predict for multi collector studies
-multi$predlogeta <- predict(multi_lm)
-mult <- ggplot(multi, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
-  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
-  theme_minimal() + 
-  labs(title = "Multi Collector Studies", y = "predicted log(eta)", x = "observed log(eta)") +
-  geom_text(x = -8, y = -5, label = lm_eqn(biofilm), parse = TRUE, size = 5) +
-  scale_color_viridis_c(option = "plasma")
 
 #Predict for Re regimes
 #Re =<40
 Re1$predlogeta <- predict(Re1_lm)
 Re1_plot <- ggplot(Re1, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
   geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
-  lims(x=c(-9, -5), y=c(-9,-5)) +
+ # lims(x=c(-9, -5), y=c(-9,-5)) +
   theme_minimal() + 
-  labs(title = "c) Re =< 40", y = "predicted log(eta)", x = "observed log(eta)") +
-  geom_text(x = -8.5, y = -5.5, label = lm_eqn(Re1), parse = TRUE, size = 5) +
+  labs(title = "c) Re =< 194", y = "predicted log(eta)", x = "observed log(eta)") +
+  geom_text(x = -8.5, y = -4.5, label = lm_eqn(Re1), parse = TRUE, size = 5) +
   scale_color_viridis_c(option = "plasma")
 
 #Re >40
 Re2$predlogeta <- predict(Re2_lm)
 Re2_plot <- ggplot(Re2, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
   geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
-  lims(x=c(-9, -4.5), y=c(-9,-4.5)) +
+#  lims(x=c(-9, -4.5), y=c(-9,-4.5)) +
   theme_minimal() + 
-  labs(title = "d) Re > 40", y = "predicted log(eta)", x = "observed log(eta)") +
-  geom_text(x = -8.5, y = -5.5, label = lm_eqn(Re2), parse = TRUE, size = 5) +
+  labs(title = "d) Re > 194", y = "predicted log(eta)", x = "observed log(eta)") +
+  geom_text(x = -7.5, y = -4.5, label = lm_eqn(Re2), parse = TRUE, size = 5) +
   scale_color_viridis_c(option = "plasma")
 
+#Plot alternate models
 
-# #Predict values for entire data set
-# logdata$predlogetaAIC <- predict(AIC_all)
-# all_AIC <- ggplot(logdata, aes(x = logY, y = predlogetaAIC)) + 
-#   geom_smooth(method = "lm", color = "black") +
-#   geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
-#   theme_minimal() + 
-#   labs(title = "a) All Runs", y = "predicted log(eta)", x = "observed log(eta)") +
-#   #geom_text(x = -8, y = -2, label = lm_eqn(AIC_all), parse = TRUE, size = 5) +
-#   scale_color_viridis_c(option = "plasma")
+logdata$prednoc1 <- predict(noc1_lm)
+png("graphics/noc1.png")
+ggplot(logdata, aes(x = logY, y = prednoc1)) + 
+  geom_smooth(method = "lm", color = "black") +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
+  theme_minimal() + 
+  labs(title = "All Runs", y = "predicted eta", x = "observed eta") +
+  geom_text(x = -8, y = -5, label = lm_eqn(logdata), parse = TRUE, size = 5) +
+  scale_color_viridis_c(option = "C", direction = -1)
+dev.off()
+
+logdata$prednoc5 <- predict(noc5_lm)
+png("graphics/noc5.png")
+ggplot(logdata, aes(x = logY, y = prednoc5)) + 
+  geom_smooth(method = "lm", color = "black") +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
+  theme_minimal() + 
+  labs(title = "All Runs", y = "predicted eta", x = "observed eta") +
+  geom_text(x = -8, y = -5, label = lm_eqn(logdata), parse = TRUE, size = 5) +
+  scale_color_viridis_c(option = "C", direction = -1)
+dev.off()
 
 ```
-
-
 
 ```{r check linear function fit 2, include=TRUE, fig.width= 4}
 
@@ -412,59 +653,59 @@ bio2 <- ggplot(biofilm, aes(x = logY, y = predlogeta2)) + geom_smooth(method = "
   #geom_text(x = -8, y = -2, label = lm_eqn2(biofilm, control), parse = TRUE, size = 5) +
   scale_color_viridis_c(option = "plasma")
 
-#Predict for data points within same range Palmer 2004 tested
-# Re_Palmer$predlogeta <- predict(AIC_palm)
-# palm_eta2 <- ggplot(Re_Palmer, aes(x = logY, y = predlogeta)) + geom_smooth(method = "lm", color = "black") +
-#   geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
-#   theme_minimal() + 
-#   labs(title = "g) Re 50-500 (same range as Palmer et al 2004)", y = "predicted log(eta)", x = "observed log(eta)") +
-#   #geom_text(x = -8, y = -2, label = lm_eqn2(Re_Palmer, control), parse = TRUE, size = 5) +
-#   scale_color_viridis_c(option = "plasma")
+Re1$predlogeta2 <- predict(Re1_lm2)
+re1_2 <- ggplot(Re1, aes(x = logY, y = predlogeta2)) + geom_smooth(method = "lm", color = "black") +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
+  theme_minimal() + 
+  labs(title = "b) Biofilm present", y = "predicted log(eta)", x = "observed log(eta)") +
+  #geom_text(x = -8, y = -2, label = lm_eqn2(biofilm, control), parse = TRUE, size = 5) +
+  scale_color_viridis_c(option = "plasma")
 
-
+Re2$predlogeta2 <- predict(Re2_lm2)
+re2_2 <- ggplot(Re2, aes(x = logY, y = predlogeta2)) + geom_smooth(method = "lm", color = "black") +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
+  theme_minimal() + 
+  labs(title = "b) Biofilm present", y = "predicted log(eta)", x = "observed log(eta)") +
+  #geom_text(x = -8, y = -2, label = lm_eqn2(biofilm, control), parse = TRUE, size = 5) +
+  scale_color_viridis_c(option = "plasma")
 
 ```
-
-
 
 ```{r plot lin fit, include=TRUE, fig.width= 4}
-#Export pngs of plots
+#Export pngs of plots 
 
-png("graphics/allupdated.png")
-print(all)
-dev.off()
+ggsave(file = "graphics/all.png", plot = all)
 
-png("graphics/bio.png")
-ggarrange(bio)
-dev.off()
+ggsave(file = "graphics/bio.png", plot = bio)
 
-png("graphics/single.png")
-ggarrange(sing)
-dev.off()
+ggsave(file = "graphics/Re1.png", plot = Re1_plot)
 
-png("graphics/multi.png")
-ggarrange(mult)
-dev.off()
+ggsave(file = "graphics/Re2.png", plot = Re2_plot)
 
-png("graphics/Re1updated.png")
-ggarrange(Re1_plot)
-dev.off()
+resplit <- ggarrange(Re1_plot, Re2_plot)
+ggsave(file = "graphics/re_split.png", plot = resplit)
 
-png("graphics/Re2updated.png")
-ggarrange(Re2_plot)
-dev.off()
-
-png("graphics/all2.png")
-print(all2)
-dev.off()
-
-png("graphics/bio2.png")
-ggarrange(bio2)
-dev.off()
-
+ggsave(file = "graphics/all2.png", plot = all2)
 
 ```
 
+```{r parrallel plots}
+
+ggplot(logdata, aes(x = logY, y = predlogeta, color = biofilm)) +
+  geom_point() +
+  labs(x = "observed log(eta)", y = "Predicted log(eta)", color = "Biofilm Growth") +
+  #scale_color_manual(labels = c(">30 days","20-29 days","8-19 days", "1-7 days", "no biofilm"), values = c("#E69F00", "#56B4E9", "#009E73", "#CC79A7", "#F0E442")) +
+  geom_parallel_slopes(se = FALSE) +
+  theme_minimal()
+
+
+
+parralell_lm <- lm(logY ~ logX1 + logX2 + logX4 + logX5 + biofilm, data = logdata)
+
+table_parra <- get_regression_table(parralell_lm, print = FALSE)
+
+
+```
 
 ```{r mini test set, include=FALSE, eval=FALSE, fig.width= 4}
 
@@ -520,19 +761,22 @@ ave_error_per <- mean((logtest$logY-logtest$predlogeta)/logtest$logY)
 
 ```
 
-
 ```{r check residuals, include=TRUE, fig.width= 4}
+#quick check of residuals 
 
+sum(abs(noc1_lm$residuals))
+sum(abs(noc5_lm$residuals))
+sum(abs(total_lm$residuals))
 
-#Check Residuals
-
-#ggplot(total_lm) + geom_point(aes(x=total_lm$fitted.values, y=total_lm$residuals))
-#ggplot(biofilm_lm) + geom_point(aes(x=biofilm_lm$fitted.values, y=biofilm_lm$residuals))
+mean(abs(noc1_lm$residuals))
+mean(abs(noc5_lm$residuals))
+mean(abs(total_lm$residuals))
 
 #Plot Residuals
 
 all_rmse <- rmse(logdata$logY, logdata$predlogeta)
-bio_rmse <- rmse(biofilm$logY, biofilm$predlogeta)
+re1_rmse <- rmse(Re1$logY, Re1$predlogeta)
+re2_rmse <- rmse(Re2$logY, Re2$predlogeta)
 
 png("graphics/residuals.png")
 
@@ -541,14 +785,30 @@ all_res <- ggplot(total_lm) + geom_histogram(aes(x = total_lm$residuals), color 
   theme_minimal() +
   labs(title = "a) All Data", x = "Residual (log(eta))", y = "Frequency")
 
-bio_res <- ggplot(biofilm_lm) + geom_histogram(aes(x = biofilm_lm$residuals), color = "lightgrey", alpha = 0.9) +
-  geom_vline(aes(xintercept = 0), color = "grey") +
-  theme_minimal() +
-  labs(title = "b) Biofilm Data", x = "Residual (log(eta))", y = "Frequency")
-
-ggarrange(all_res, bio_res, nrow=1)
+ggarrange(all_res, nrow=1)
 dev.off()
 
+png("graphics/Re_residuals.png")
+
+ggplot() + geom_point(aes(x = logdata$Re_c, y = total_lm$residuals), alpha = 0.8, size = 5) +
+  theme_minimal() +
+  labs(title = "Model Residuals", x = "Re_c", y = "Residual log(eta)")
+
+dev.off()
+
+png("graphics/split_residuals.png")
+
+re1 <- ggplot() + geom_point(aes(x = Re1$Re_c, y = Re1_lm$residuals), alpha = 0.8, size = 5) +
+  theme_minimal() +
+  labs(title = "Model Residuals", x = "Re_c", y = "Residual log(eta)")
+
+re2 <- ggplot() + geom_point(aes(x = Re2$Re_c, y = Re2_lm$residuals), alpha = 0.8, size = 5) +
+  theme_minimal() +
+  labs(title = "Model Residuals", x = "Re_c", y = "Residual log(eta)")
+
+ggarrange(re1, re2, nrow = 1)
+
+dev.off()
 
 #Find P values
 # mu2 <- mean(biofilm$logY)
@@ -589,22 +849,20 @@ PRESS <- function(linear.model) {
 
 pred_all <- pred_r_squared(total_lm) #Most of these are fairly close to the actual R2
 pred_bio <- pred_r_squared(biofilm_lm)
-pred_re1 <- pred_r_squared(Re1_lm) #This is very far off (.1 vs .9), way overfit for small sample
-pred_re2 <- pred_r_squared(Re2_lm)
+pred_re1 <- pred_r_squared(Re1_lm) #This is now almost identical
+pred_re2 <- pred_r_squared(Re2_lm)  
 
 pred_all2 <- pred_r_squared(total_lm2_final)
 pred_bio2 <- pred_r_squared(biofilm_lm2_final)
 
-#all: 0.51 and bio: 0.49 for dataset with 5 mode Fauria data
-#all:.36 and bio:.38 for dataset with 1 mode fauria data
+#RMSE
 
+total_rmse <- (mean((logdata$predlogeta-logdata$logY)**2))**(1/2) #0.70
 ```
-
-
 
 ```{r bootstrap R2, include=TRUE, fig.width=10}
 
-#Set up modified logfit function to return R2
+# Set up modified logfit function to return R2
 
 bootFitR2 <- function(formula, logdata, indices){
   
@@ -616,12 +874,21 @@ bootFitR2 <- function(formula, logdata, indices){
 
 }
 
-#Set seed
+# Set seed
 set.seed(1234)
 
-#set up bootstrap to return R2 value using 10000 bootstraps
+# set up bootstrap to return R2 value using 10000 bootstraps
 
-bootR2 <- function(data){
+
+bootR2_noc1 <- function(data){
+  
+  R2 <- boot(data = logdata, statistic = bootFitR2, 
+  R=10000, formula = logY ~ logX2 + logX3 + logX4 + logX5)
+  
+  return(R2)
+}
+
+bootR2_noc3 <- function(data){
   
   R2 <- boot(data = logdata, statistic = bootFitR2, 
   R=10000, formula = logY ~ logX1 + logX2 + logX4 + logX5)
@@ -629,10 +896,30 @@ bootR2 <- function(data){
   return(R2)
 }
 
-all_R2 <- bootR2(data = data)
-biofilm_R2 <- bootR2(data=biofilm)
-Re1_R2 <- bootR2(data = Re1)
-Re2_R2 <- bootR2(data = Re2)
+
+bootR2_noc4 <- function(data){
+  
+  R2 <- boot(data = logdata, statistic = bootFitR2, 
+  R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX5)
+  
+  return(R2)
+}
+
+
+bootR2_noc5 <- function(data){
+  
+  R2 <- boot(data = logdata, statistic = bootFitR2, 
+  R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
+  
+  return(R2)
+}
+
+all_R2 <- bootR2_noc3(data = logdata)
+# biofilm_R2 <- bootR2(data=biofilm)
+Re1_R2 <- bootR2_noc3(data = Re1)
+Re2_R2 <- bootR2_noc4(data = Re2)
+allnoc1 <- bootR2_noc1(data = logdata)
+allnoc5 <- bootR2_noc5(data = logdata)
 
 #Get 95% confidence intervals of bootstrapped results
 
@@ -640,9 +927,9 @@ all_R2_ci <- boot.ci(all_R2, conf = 0.95, type = "norm")
 all_R2_min <- all_R2_ci$normal[2]
 all_R2_max <- all_R2_ci$normal[3]
 
-biofilm_R2_ci <- boot.ci(biofilm_R2, conf = 0.95, type = "norm")
-biofilm_R2_min <- biofilm_R2_ci$normal[2]
-biofilm_R2_max <- biofilm_R2_ci$normal[3]
+# biofilm_R2_ci <- boot.ci(biofilm_R2, conf = 0.95, type = "norm")
+# biofilm_R2_min <- biofilm_R2_ci$normal[2]
+# biofilm_R2_max <- biofilm_R2_ci$normal[3]
 
 Re1_R2_ci <- boot.ci(Re1_R2, conf = 0.95, type = "norm")
 Re1_R2_min <- Re1_R2_ci$normal[2]
@@ -651,6 +938,14 @@ Re1_R2_max <- Re1_R2_ci$normal[3]
 Re2_R2_ci <- boot.ci(Re2_R2, conf = 0.95, type = "norm")
 Re2_R2_min <- Re2_R2_ci$normal[2]
 Re2_R2_max <- Re2_R2_ci$normal[3]
+
+noc1_R2_ci <- boot.ci(allnoc1, conf = 0.95, type = "norm")
+noc1_R2_min <- noc1_R2_ci$normal[2]
+noc1_R2_max <- noc1_R2_ci$normal[3]
+
+noc5_R2_ci <- boot.ci(allnoc5, conf = 0.95, type = "norm")
+noc5_R2_min <- noc5_R2_ci$normal[2]
+noc5_R2_max <- noc5_R2_ci$normal[3]
 
 ```
 
@@ -662,6 +957,7 @@ all_R2_plot <- as.data.frame(all_R2_plot)
 
 biofilm_R2_plot <- biofilm_R2$t #extract just R2 values for biofilm data
 biofilm_R2_plot <- as.data.frame(biofilm_R2_plot)
+
 
 png("graphics/R2.png")
 
@@ -676,7 +972,7 @@ r2all <- ggplot(all_R2_plot) + geom_histogram(aes(x = V1), color = "lightgrey", 
 r2bio <- ggplot(biofilm_R2_plot) + geom_histogram(aes(x = V1), color="lightgrey", alpha = 0.9) +
   geom_vline(aes(xintercept = biofilm_R2_min), color = "blue") + 
   geom_vline(aes(xintercept = biofilm_R2_max), color = "blue") +
-  geom_vline(aes(xintercept = bio_R2), col="green") +
+#  geom_vline(aes(xintercept = biofilm_R2), col="green") +
   theme_minimal() +
   labs(title = "b) Biofilm Data", x = "R2 values", y = "Frequency")
 
@@ -718,6 +1014,7 @@ dev.off()
 ```
 
 ```{r bootstrap coef, include=TRUE}
+#NOTE TO SAM: This is producing wild values (as of 8/27) fix it before you send it to anyone
 
 #Set up modified logfit function to return coefficients
 
@@ -735,23 +1032,49 @@ bootFitCoef <- function(formula, logdata, indices){
 set.seed(123)
 
 #set up bootstrap to return coef values using 10000 bootstraps
-bootCoef <- function(data){
+
+bootCoef_noc1 <- function(data){
   
   coef <- boot(data = data, statistic = bootFitCoef, 
-               R=10000, formula = logY ~ logX1 + logX2 +  logX4 + logX5)
+               R=10000, formula = logY ~ logX2 + logX3 + logX4 + logX5)
   
   return(coef)
 }
 
-all_coef <- bootCoef(data = logdata)
-biofilm_coef <- bootCoef(data = biofilm)
-Re1_coef <- bootCoef(data = Re1)
-Re2_coef <- bootCoef(data = Re2)
-# Re3_coef <- bootCoef(data = Re3)
-# Re4_coef <- bootCoef(data = Re4)
+bootCoef_noc3 <- function(data){
+  
+  coef <- boot(data = data, statistic = bootFitCoef, 
+               R=10000, formula = logY ~ logX1 + logX2 + logX4 + logX5)
+  
+  return(coef)
+}
+
+bootCoef_noc4 <- function(data){
+  
+  coef <- boot(data = data, statistic = bootFitCoef, 
+               R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX5)
+  
+  return(coef)
+}
+
+bootCoef_noc5 <- function(data){
+  
+  coef <- boot(data = data, statistic = bootFitCoef, 
+               R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4)
+  
+  return(coef)
+}
+
+
+all_coef <- bootCoef_noc3(data = logdata)
+# biofilm_coef <- bootCoef(data = biofilm)
+Re1_coef <- bootCoef_noc3(data = Re1)
+Re2_coef <- bootCoef_noc4(data = Re2)
+
+noc1_coef <- bootCoef_noc1(data = logdata)
+noc5_coef <- bootCoef_noc5(data = logdata)
 
 ```
-
 
 ```{r get min max 95% ci for coefficients}
 #TO DO FOR SAM: Make this less ugly and hacky by writing a function, somehow
@@ -761,35 +1084,39 @@ Re2_coef <- bootCoef(data = Re2)
 all_int <- boot.ci(all_coef, coef = 0.95, type = "bca", index = 1) #intersect
 all_C1 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 2) #C1
 all_C2 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 3) #C2
-all_C3 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 4) #C3
-all_C4 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 5) #C4
+# all_C3 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 4) #C3
+all_C4 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 4) #C4
+all_C5 <- boot.ci(all_coef, conf = 0.95, type = "bca", index = 5) #C5
 
 #Extract CI values 
 all_int <- all_int$bca[4:5] #4 = min, 5 = max
 all_C1 <- all_C1$bca[4:5]
 all_C2 <- all_C2$bca[4:5]
-all_C3 <- all_C3$bca[4:5]
+# all_C3 <- all_C3$bca[4:5]
 all_C4 <- all_C4$bca[4:5]
+all_C5 <- all_C5$bca[4:5]
 
-all_CI <- rbind(all_int, all_C1, all_C2, all_C3, all_C4)
+all_CI <- rbind(all_int, all_C1, all_C2, all_C4, all_C5)
 all_CI <- as.data.frame(all_CI)
 
 
 #biofilm
-biofilm_int <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 1) #intersect
-biofilm_C1 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 2) #C1
-biofilm_C2 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 3) #C2
-biofilm_C3 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 4) #C3
-biofilm_C4 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 5) #C4
-
-biofilm_int <- biofilm_int$bca[4:5]
-biofilm_C1 <- biofilm_C1$bca[4:5]
-biofilm_C2 <- biofilm_C2$bca[4:5]
-biofilm_C3 <- biofilm_C3$bca[4:5]
-biofilm_C4 <- biofilm_C4$bca[4:5]
-
-biofilm_CI <- rbind(biofilm_int, biofilm_C1, biofilm_C2, biofilm_C3, biofilm_C4)
-biofilm_CI <- as.data.frame(biofilm_CI)
+# biofilm_int <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 1) #intersect
+# biofilm_C1 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 2) #C1
+# biofilm_C2 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 3) #C2
+# biofilm_C3 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 4) #C3
+# biofilm_C4 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 5) #C4
+# biofilm_C5 <- boot.ci(biofilm_coef, conf = 0.95, type = "bca", index = 6) #C5
+# 
+# biofilm_int <- biofilm_int$bca[4:5]
+# biofilm_C1 <- biofilm_C1$bca[4:5]
+# biofilm_C2 <- biofilm_C2$bca[4:5]
+# biofilm_C3 <- biofilm_C3$bca[4:5]
+# biofilm_C4 <- biofilm_C4$bca[4:5]
+# biofilm_C5 <- biofilm_C5$bca[4:5]
+# 
+# biofilm_CI <- rbind(biofilm_int, biofilm_C1, biofilm_C2, biofilm_C3, biofilm_C4, biofilm_C5)
+# biofilm_CI <- as.data.frame(biofilm_CI)
 
 
 #Re numbers <40
@@ -797,17 +1124,19 @@ biofilm_CI <- as.data.frame(biofilm_CI)
 Re1_int <- boot.ci(Re1_coef, coef = 0.95, type = "bca", index = 1) #intersect
 Re1_C1 <- boot.ci(Re1_coef, conf = 0.95, type = "bca", index = 2) #C1
 Re1_C2 <- boot.ci(Re1_coef, conf = 0.95, type = "bca", index = 3) #C2
-Re1_C3 <- boot.ci(Re1_coef, conf = 0.95, type = "bca", index = 4) #C3
-Re1_C4 <- boot.ci(Re1_coef, conf = 0.95, type = "bca", index = 5) #C4
+# Re1_C3 <- boot.ci(Re1_coef, conf = 0.95, type = "bca", index = 4) #C3
+Re1_C4 <- boot.ci(Re1_coef, conf = 0.95, type = "bca", index = 4) #C4
+Re1_C5 <- boot.ci(Re1_coef, conf = 0.95, type = "bca", index = 5) #C5
 
 #Extract CI values 
 Re1_int <- Re1_int$bca[4:5] #4 = min, 5 = max
 Re1_C1 <- Re1_C1$bca[4:5]
 Re1_C2 <- Re1_C2$bca[4:5]
-Re1_C3 <- Re1_C3$bca[4:5]
+# Re1_C3 <- Re1_C3$bca[4:5]
 Re1_C4 <- Re1_C4$bca[4:5]
+Re1_C5 <- Re1_C5$bca[4:5]
 
-Re1_CI <- rbind(Re1_int, Re1_C1, Re1_C2, Re1_C3, Re1_C4)
+Re1_CI <- rbind(Re1_int, Re1_C1, Re1_C2, Re1_C4, Re1_C5)
 Re1_CI <- as.data.frame(Re1_CI)
 
 #Re numbers >40
@@ -815,25 +1144,67 @@ Re2_int <- boot.ci(Re2_coef, coef = 0.95, type = "bca", index = 1) #intersect
 Re2_C1 <- boot.ci(Re2_coef, conf = 0.95, type = "bca", index = 2) #C1
 Re2_C2 <- boot.ci(Re2_coef, conf = 0.95, type = "bca", index = 3) #C2
 Re2_C3 <- boot.ci(Re2_coef, conf = 0.95, type = "bca", index = 4) #C3
-Re2_C4 <- boot.ci(Re2_coef, conf = 0.95, type = "bca", index = 5) #C4
+# Re2_C4 <- boot.ci(Re2_coef, conf = 0.95, type = "bca", index = 5) #C4
+Re2_C5 <- boot.ci(Re2_coef, conf = 0.95, type = "bca", index = 5) #C5
 
 #Extract CI values 
 Re2_int <- Re2_int$bca[4:5] #4 = min, 5 = max
 Re2_C1 <- Re2_C1$bca[4:5]
 Re2_C2 <- Re2_C2$bca[4:5]
 Re2_C3 <- Re2_C3$bca[4:5]
-Re2_C4 <- Re2_C4$bca[4:5]
+# Re2_C4 <- Re2_C4$bca[4:5]
+Re2_C5 <- Re2_C5$bca[4:5]
 
-Re2_CI <- rbind(Re2_int, Re2_C1, Re2_C2, Re2_C3, Re2_C4)
+Re2_CI <- rbind(Re2_int, Re2_C1, Re2_C2, Re2_C3, Re2_C5)
 Re2_CI <- as.data.frame(Re2_CI)
 
+
+#dropped c1 term data
+#95% confidence interval of bootstraps
+noc1_int <- boot.ci(noc1_coef, coef = 0.95, type = "bca", index = 1) #intersect
+#noc1_C1 <- boot.ci(noc1_coef, conf = 0.95, type = "bca", index = 2) #C1
+noc1_C2 <- boot.ci(noc1_coef, conf = 0.95, type = "bca", index = 2) #C2
+noc1_C3 <- boot.ci(noc1_coef, conf = 0.95, type = "bca", index = 3) #C3
+noc1_C4 <- boot.ci(noc1_coef, conf = 0.95, type = "bca", index = 4) #C4
+noc1_C5 <- boot.ci(noc1_coef, conf = 0.95, type = "bca", index = 5) #C5
+
+#Extract CI values 
+noc1_int <- noc1_int$bca[4:5] #4 = min, 5 = max
+#noc1_C1 <- noc1_C1$bca[4:5]
+noc1_C2 <- noc1_C2$bca[4:5]
+noc1_C3 <- noc1_C3$bca[4:5]
+noc1_C4 <- noc1_C4$bca[4:5]
+noc1_C5 <- noc1_C5$bca[4:5]
+
+noc1_CI <- rbind(noc1_int, noc1_C2, noc1_C3, noc1_C4, noc1_C5)
+noc1_CI <- as.data.frame(noc1_CI)
+
+#dropped c5 term data
+#95% confidence interval of bootstraps
+noc5_int <- boot.ci(noc5_coef, coef = 0.95, type = "bca", index = 1) #intersect
+noc5_C1 <- boot.ci(noc5_coef, conf = 0.95, type = "bca", index = 2) #C1
+noc5_C2 <- boot.ci(noc5_coef, conf = 0.95, type = "bca", index = 3) #C2
+noc5_C3 <- boot.ci(noc5_coef, conf = 0.95, type = "bca", index = 4) #C3
+noc5_C4 <- boot.ci(noc5_coef, conf = 0.95, type = "bca", index = 5) #C4
+#noc5_C5 <- boot.ci(noc5_coef, conf = 0.95, type = "bca", index = 5) #C5
+
+#Extract CI values 
+noc5_int <- noc5_int$bca[4:5] #4 = min, 5 = max
+noc5_C1 <- noc5_C1$bca[4:5]
+noc5_C2 <- noc5_C2$bca[4:5]
+noc5_C3 <- noc5_C3$bca[4:5]
+noc5_C4 <- noc5_C4$bca[4:5]
+#noc5_C5 <- noc5_C5$bca[4:5]
+
+noc5_CI <- rbind(noc5_int, noc5_C1, noc5_C2, noc5_C3, noc5_C4)
+noc5_CI <- as.data.frame(noc5_CI)
 
 #Vectors of min and max coefs
 min_all <- all_CI$V1
 max_all <- all_CI$V2
 
-min_biofilm <- biofilm_CI$V1
-max_biofilm <- biofilm_CI$V2
+# min_biofilm <- biofilm_CI$V1
+# max_biofilm <- biofilm_CI$V2
 
 min_Re1 <- Re1_CI$V1
 max_Re1 <- Re1_CI$V2
@@ -841,150 +1212,305 @@ max_Re1 <- Re1_CI$V2
 min_Re2 <- Re2_CI$V1
 max_Re2 <- Re2_CI$V2
 
+min_noc1 <- noc1_CI$V1
+max_noc1 <- noc1_CI$V2
+
+min_noc5 <- noc5_CI$V1
+max_noc5 <- noc5_CI$V2
 
 #Vectors of fitted model coefs
-fit_all <- total_lm$coefficients
-fit_biofilm <- biofilm_lm$coefficients
-fit_Re1 <- Re1_lm$coefficients
-fit_Re2 <- Re2_lm$coefficients
-
+fit_all <- AIC_all$coefficients
+# fit_biofilm <- biofilm_lm$coefficients
+fit_Re1 <- AIC_re1$coefficients
+fit_Re2 <- AIC_re2$coefficients
+fit_noc1 <- noc1_lm$coefficients
+fit_noc5 <- noc5_lm$coefficients
 
 ```
 
 ```{r make table of min/max coefficients}
-#Table with 95% CI min/max results and fitted models
+# Table with 95% CI min/max results and fitted models
 table_all_fit <- rbind(min_all, fit_all, max_all) 
 table_all_fit <- as.data.frame(table_all_fit) 
-colnames(table_all_fit) <- c("Intercept", "C1", "C2", "C3", "C4")
+colnames(table_all_fit) <- c("Intercept", "C1", "C2", "C4", "C5")
 row.names(table_all_fit) <- c("Min", "Fit", "Max")
 
-table_bio_fit <- rbind(min_biofilm, fit_biofilm, max_biofilm) 
-table_bio_fit <- as.data.frame(table_bio_fit) 
-colnames(table_bio_fit) <- c("Intercept", "C1", "C2", "C3", "C4")
-row.names(table_bio_fit) <- c("Min", "Fit", "Max")
+# table_bio_fit <- rbind(min_biofilm, fit_biofilm, max_biofilm) 
+# table_bio_fit <- as.data.frame(table_bio_fit) 
+# colnames(table_bio_fit) <- c("Intercept", "C1", "C2", "C3", "C4", "C5")
+# row.names(table_bio_fit) <- c("Min", "Fit", "Max")
 
 table_Re1_fit <- rbind(min_Re1, fit_Re1, max_Re1) 
 table_Re1_fit <- as.data.frame(table_Re1_fit) 
-colnames(table_Re1_fit) <- c("Intercept", "C1", "C2", "C3", "C4")
+colnames(table_Re1_fit) <- c("Intercept", "C1", "C2", "C4", "C5")
 row.names(table_Re1_fit) <- c("Min", "Fit", "Max")
 
 table_Re2_fit <- rbind(min_Re2, fit_Re2, max_Re2) 
 table_Re2_fit <- as.data.frame(table_Re2_fit) 
-colnames(table_Re2_fit) <- c("Intercept", "C1", "C2", "C3", "C4")
+colnames(table_Re2_fit) <- c("Intercept", "C1", "C2", "C3", "C5")
 row.names(table_Re2_fit) <- c("Min", "Fit", "Max")
+
+table_noc1_fit <- rbind(min_noc1, fit_noc1, max_noc1) 
+table_noc1_fit <- as.data.frame(table_noc1_fit) 
+colnames(table_noc1_fit) <- c("Intercept", "C2", "C3", "C4", "C5")
+row.names(table_noc1_fit) <- c("Min", "Fit", "Max")
+
+table_noc5_fit <- rbind(min_noc5, fit_noc5, max_noc5) 
+table_noc5_fit <- as.data.frame(table_noc5_fit) 
+colnames(table_noc5_fit) <- c("Intercept", "C1", "C2", "C3", "C4")
+row.names(table_noc5_fit) <- c("Min", "Fit", "Max")
 
 
 ```
 
 ```{r fit Palmer eqn}
-#Equation from Palmer et al 2014
+#Equation from Palmer et al 2014 
 #Fit from Re 50-500
 Palmer <- function(Re, #Reynolds Number Re_c
                    R #Effective radii ratio (d_p/d_c)
 ){
   eta <- (0.224*(Re**0.718)*(R**2.08))
-  eta <- log(eta)
+  logeta <- log(eta)
   
-  return(eta)
+  return(eta) #adjust to return either eta or ln(eta)
 }
 
 logdata$palmer <- Palmer(Re = logdata$Re_c, R = logdata$radius_ratio)
 biofilm$palmer <- Palmer(Re = biofilm$Re_c, R = biofilm$radius_ratio)
 Re1$palmer <- Palmer(Re = Re1$Re_c, R = Re1$radius_ratio)
 Re2$palmer <- Palmer(Re = Re2$Re_c, R = Re2$radius_ratio)
-Re_Palmer$palmer <- Palmer(Re = Re_Palmer$Re_c, R = Re_Palmer$radius_ratio)
-single$palmer <- Palmer(Re = single$Re_c, R = single$radius_ratio)
 
-# Re4$palmer <- Palmer(Re = Re4$Re_c, R = Re4$radius_ratio)
+
+#R2 values
+
+palmer_r2 <- cor(logdata$logY, logdata$palmer)**2  #0.000
+
+#Residuals
+
+(mean((logdata$predeta-logdata$eta)**2))**(1/2) #for comparison: 0.002 mean residual from the synthesis model
+
+palmer_rmse <- (mean((logdata$palmer-logdata$eta)**2))**(1/2) #10.17 mean residual
 ```
 
-```{r Palmer plots}
+```{r fit Fauria eqn}
+#Equation from Fauria et al 2015
+#Fit from Re 50-500
+Fauria <- function(Re, #Reynolds Number Re_c
+                   R #Effective radii ratio (d_p/d_c)
+){
+  eta <- (2.06*(Re**-1.14)*(R**0.65))
+  logeta <- log(eta)
+  
+  return(eta) #adjust to return either eta or ln(eta)
+}
 
-#This plot is all Re values
+logdata$fauria <- Fauria(Re = logdata$Re_c, R = logdata$radius_ratio)
+biofilm$fauria <- Fauria(Re = biofilm$Re_c, R = biofilm$radius_ratio)
+Re1$fauria <- Fauria(Re = Re1$Re_c, R = Re1$radius_ratio)
+Re2$fauria <- Fauria(Re = Re2$Re_c, R = Re2$radius_ratio)
 
-png("graphics/palmer_all.png")
+#R2 values
+
+fauria_r2 <- cor(logdata$logY, logdata$fauria)**2  #0.31 ; same ; same
+
+#Residuals
+
+fauria_rmse <- (mean((logdata$fauria-logdata$eta)**2))**(1/2) #7.61 mean residual
+```
+
+```{r Eqn comparison plots}
+
+
+#All eqns on separate plots
 
 a <- ggplot(logdata) +
-  geom_point(aes(x = logY, y = palmer, color = Re_c), size = 2, alpha = .8) +
+  geom_point(aes(x = logY, y = palmer, color = Re_c), size = 2, alpha = 0.8) +
   xlab("Observed log(eta)") + ylab("Predicted log(eta)[Palmer et al 2004]") +
+  #lims(x=c(-28, -2), y=c(-28,-2)) +
   theme_minimal() +
-  scale_color_viridis_c()
+  scale_color_viridis_c(option = "plasma")
 
 b <- ggplot(logdata) +
-  geom_point(aes(x = logY, y = predlogeta, color = Re_c), size = 2, alpha = .8) +
-  xlab("Observed log(eta)") + ylab("Predicted log(eta)[Our model]") +
+  geom_point(aes(x = logY, y = fauria, color = Re_c), size = 2, alpha = 0.8) +
+  xlab("Observed log(eta)") + ylab("Predicted log(eta)[Fauria et al 2015]") +
+  #lims(x=c(-11, -3), y=c(-11,-3)) +
   theme_minimal() +
-  scale_color_viridis_c()
+  scale_color_viridis_c(option = "plasma")
 
 c <- ggplot(logdata) +
-  geom_point(aes(x = predlogeta, y = palmer, color = Re_c), size = 2, alpha = .75) +
-  xlab("Predicted log(eta)[Our model]") + ylab("Predicted log(eta)[Palmer et al 2004]") +
-  theme_minimal() +
-  scale_color_viridis_c()
-
-ggarrange(a,b,c, row = 1)
-
-dev.off()
-
-#This plot is only single collector experiements (which is what the original palmer eqn was based on)
-png("graphics/palmer_palm.png")
-
-a <- ggplot(single) +
-  geom_point(aes(x = logY, y = palmer, color = Re_c), size = 2, alpha = 0.8) +
-  xlab("Observed log(eta)") + ylab("Predicted log(eta)[Palmer et al 2004]") +
-  theme_minimal() +
-  scale_color_viridis_c()
-
-b <- ggplot(single) +
   geom_point(aes(x = logY, y = predlogeta, color = Re_c), size = 2, alpha = 0.8) +
-  xlab("Observed log(eta)") + ylab("Predicted log(eta)[Our model]") +
+  xlab("Observed log(eta)") + ylab("Predicted log(eta)[This paper]") +
+  #lims(x=c(-10, -4), y=c(-10,-4)) +
   theme_minimal() +
-  scale_color_viridis_c()
+  scale_color_viridis_c(option = "plasma")
 
-c <- ggplot(single) +
-  geom_point(aes(x = predlogeta, y = palmer, color = Re_c), size = 2, alpha = 0.8) +
-  xlab("Predicted log(eta)[Our model]") + ylab("Predicted log(eta)[Palmer et al 2004]") +
-  theme_minimal() +
-  scale_color_viridis_c()
+comp3plot <- ggarrange(a,b,c, common.legend = TRUE)
 
-ggarrange(a,b,c, row = 1)
+ggsave(file = "graphics/all_eqn_panel.png", plot = comp3plot)
 
-dev.off()
 
-#This plot is only data with biofilm present
-png("graphics/palmer_bio.png")
+#Plot results from all equations on the same plot
+#create "skinny" dataframe
 
-a <- ggplot(biofilm) +
-  geom_point(aes(x = logY, y = palmer, color = Re_c), size = 2, alpha = 0.8) +
-  xlab("Observed log(eta)") + ylab("Predicted log(eta)[Palmer et al 2004]") +
-  theme_minimal() +
-  scale_color_viridis_c()
+#uncomment this section for log(eta)
 
-b <- ggplot(biofilm) +
-  geom_point(aes(x = logY, y = predlogeta, color = Re_c), size = 2, alpha = 0.8) +
-  xlab("Observed log(eta)") + ylab("Predicted log(eta)[Our model]") +
-  theme_minimal() +
-  scale_color_viridis_c()
+# gather_a <- logdata %>%
+#   dplyr::select(c(Re_c, logY, predlogeta)) %>% #just the pertinent variables
+#   mutate(author = "This paper") %>% #set author name to label on plot later
+#   mutate(predlogeta = as.numeric(predlogeta)) #change from named numeric to numeric
+# 
+# gather_b <- logdata %>%
+#   dplyr::select(c(Re_c, logY, palmer)) %>%
+#   rename(predlogeta = palmer) %>% #change variable name to match for later rbind
+#   mutate(author = "Palmer") %>%
+#   mutate(predlogeta = as.numeric(predlogeta))
+# 
+# gather_c <- logdata %>%
+#   dplyr::select(c(Re_c, logY, fauria)) %>%
+#   rename(predlogeta = fauria) %>%
+#   mutate(author = "Fauria") %>%
+#   mutate(predlogeta = as.numeric(predlogeta))
+# 
+# gather_data <- rbind(gather_a, gather_b, gather_c) #put into same dataframe
 
-c <- ggplot(biofilm) +
-  geom_point(aes(x = predlogeta, y = palmer, color = Re_c), size = 2, alpha = 0.8) +
-  xlab("Predicted log(eta)[Our model]") + ylab("Predicted log(eta)[Palmer et al 2004]") +
-  theme_minimal() +
-  scale_color_viridis_c()
+#uncomment this section for eta
 
-ggarrange(a,b,c, row = 1)
+gather_a <- logdata %>%
+  dplyr::select(c(Re_c, eta, predeta)) %>% #just the pertinent variables
+  mutate(author = "This paper") %>% #set author name to label on plot later
+  mutate(predeta = as.numeric(predeta)) #change from named numeric to numeric
 
-dev.off()
+gather_b <- logdata %>%
+  dplyr::select(c(Re_c, eta, palmer)) %>%
+  rename(predeta = palmer) %>% #change variable name to match for later rbind
+  mutate(author = "Palmer") %>%
+  mutate(predeta = as.numeric(predeta))
+
+gather_c <- logdata %>%
+  dplyr::select(c(Re_c, eta, fauria)) %>%
+  rename(predeta = fauria) %>%
+  mutate(author = "Fauria") %>%
+  mutate(predeta = as.numeric(predeta))
+
+gather_data <- rbind(gather_a, gather_b, gather_c) #put into same dataframe
+
+#plot data
+xlablog = expression(paste("observed ln(", eta, ")"))
+ylablog = expression(paste("predicted ln(",  eta, ")"))
+
+xlab = expression(paste("observed ", eta))
+ylab = expression(paste("predicted ",  eta))
+
+comp1plot <- ggplot(gather_data) + geom_point(aes(y = predeta, x = eta, color = Re_c, shape = author), size = 6, alpha = 0.6) +
+  labs(x = xlab, y = ylab) +
+ # lims(x = c(-15, 0)) +
+  lims(y = c(0, 0.05)) +
+  theme_pubclean() +
+  scale_color_viridis_c(option = "plasma", direction = 1)
+
+ggsave(filename = "graphics/all_eqn_nonlog_b.png", plot = comp1plot)
+
+#All eqns with Re regime split
+
+# png("graphics/all_eqn_Re.png")
+# 
+# a <- ggplot(logdata) +
+#   geom_point(aes(x = logY, y = palmer, color = Re_c), size = 2, alpha = 0.8) +
+#   xlab("Observed log(eta)") + ylab("Predicted log(eta)[Palmer et al 2004]") +
+#   #lims(x=c(-28, -2), y=c(-28,-2)) +
+#   theme_minimal() +
+#   scale_color_viridis_c(option = "plasma")
+# 
+# b <- ggplot(logdata) +
+#   geom_point(aes(x = logY, y = fauria, color = Re_c), size = 2, alpha = 0.8) +
+#   xlab("Observed log(eta)") + ylab("Predicted log(eta)[Fauria et al 2015]") +
+#   #lims(x=c(-11, -3), y=c(-11,-3)) +
+#   theme_minimal() +
+#   scale_color_viridis_c(option = "plasma")
+# 
+# c <- ggplot(Re1) +
+#   geom_point(aes(x = logY, y = predlogeta, color = Re_c), size = 2, alpha = 0.8) +
+#   xlab("Observed log(eta)") + ylab("Predicted log(eta)[This paper; Re <40]") +
+#   #lims(x=c(-10, -4), y=c(-10,-4)) +
+#   theme_minimal() +
+#   scale_color_viridis_c(option = "plasma")
+# 
+# d <- ggplot(Re2) +
+#   geom_point(aes(x = logY, y = predlogeta, color = Re_c), size = 2, alpha = 0.8) +
+#   xlab("Observed log(eta)") + ylab("Predicted log(eta)[This paper; Re >40]") +
+#   #lims(x=c(-10, -4), y=c(-10,-4)) +
+#   theme_minimal() +
+#   scale_color_viridis_c(option = "plasma")
+# 
+# ggarrange(a,b,c,d, common.legend = TRUE)
+# 
+# dev.off()
+
+
+
+
+
 
 ```
 
+```{r Purich eval = FALSE include = FALSE}
+#Compare eta values predicted by Eqn 9 in Purich 2006 (originally from Palmer 2004)
+
+#Stokes settling velocity eqn
+Stokes <- function(dense_p, #particle density
+                   dense_f, #fluid density
+                   d_p, #diameter of particle in cm
+                   mu #kinematic viscosity
+){
+  g <- 980.66 #gravity in cm/s2
+  s <- dense_p/dense_f
+  r_p <- d_p/2
+  w_stk <- (2/9)*(((r_p^2)*g*dense_f*(s-1))/mu)
+
+return(w_stk)
+  }
+
+logdata$w_stk <- Stokes(dense_p = logdata$p_density,
+                        dense_f = logdata$f_density,
+                        d_p = logdata$d_p_cm, 
+                        mu = logdata$kin_viscosity_cm2)
+
+#settling rate constant (eqn 8 in Purich)
+
+findk <- function(w_stk, #setling velocty
+                  h #height of collectors underwater
+){
+  
+  k <- w_stk/h
+  
+return(k)
+}
+
+
+logdata$k <- findk(w_stk = logdata$w_stk, 
+                   h = logdata$height)
+
+
+#In order to use eqn 17 from Purich, need the number of particles on the collectors (N_c)
+
+#logdata$N_c <-  
+
+
+```
 
 ```{r export clean dataset, include=TRUE,eval=FALSE}
 
 #Write cleaned data file
+
+#re_total_data <- rbind(Re1, Re2)
+#split_predlogeta <- re_total_data$predlogeta
+#logdata <- cbind(logdata, split_predlogeta)
+
+
 cleandata <- logdata %>%
-  dplyr::select("run_ID", "paper", "eta", "Re_c", "frontal_area_unit_volume", "height", "d_c", "d_p_cm", "radius_ratio", "ave_velocity_cm", "kin_viscosity_cm2", "f_density", "c_density",
-           "L", "J","logY", "logX1", "logX2", "logX4", "logX5","predlogeta")
+  dplyr::select("run_ID", "paper", "eta", "Re_c", "frontal_area_unit_volume", "height", "d_c", "d_p_cm", "radius_ratio", 
+                "ave_velocity_cm", "kin_viscosity_cm2", "f_density", "p_density", "c_density", 
+                "L", "J","logY", "logX1", "logX2", "logX4", "logX5","predlogeta", "split_predlogeta")
   
 write.csv(cleandata, file = "data/flume_model_output.csv")
 

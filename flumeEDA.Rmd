@@ -1,0 +1,72 @@
+---
+title: "flumeEDA"
+author: "Sam Stein"
+date: "7/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r import data}
+
+#Sam - import data from flumemodel.rmd here
+#rdata file maybe to avoid waiting for bootstrap?
+
+
+```
+
+
+## Pearson Correlation Coefs
+
+```{r pearson}
+
+
+temp <- logdata %>% 
+  filter(paper == "Purich_2006") 
+  #min(frontal_area_unit_volume)
+min(temp$p_density)
+max(temp$p_density)
+```
+
+
+## Impact of Biofilm
+
+Across all samples, eta values were higher for non-biofilm samples than those with biofilm present or simulated with silicone grease. After binning samples by Re and a values and comparing, the eta values were higher for...
+
+```{r biofilm}
+
+#Across all samples
+bio_eta <- logdata %>%
+  filter(paper == "ESDL") %>%
+  group_by(biofilm, Re_c, frontal_area_unit_volume) %>% #, Re_c, frontal_area_unit_volume
+  summarise(mean =  mean(eta))
+
+bio_eta_max <- bio_eta %>%
+  group_by(Re_c) %>%
+  summarise("max eta" = max(mean)) %>%
+  inner_join(bio_eta, by = c("max eta" = "mean"))
+
+```
+
+```{r ESDL}
+
+#Comparing kc and eta values
+
+esdl <- read_csv("data/ece_table_v2.csv")
+
+esdl_cat <- esdl %>%
+  filter(density > 0) %>%
+  distinct(Re_c, frontal_area, biofilm)
+
+esdl_summ <- esdl %>%
+  filter(density > 0) %>%
+  #filter(Re_c > 199) %>%
+  group_by(biofilm) %>%
+  summarise(k_s = mean(k_s), k_c = mean(k_c), eta = mean(ece_per))
+
+
+
+
+```

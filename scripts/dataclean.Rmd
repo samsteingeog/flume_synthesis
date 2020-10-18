@@ -9,11 +9,12 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
-
-#setWD
-setwd("~/flume_synthesis")
+library(readxl)
 
 ```
+
+
+Fauria et al. (2014) data was provided over a range of particle size bins; this markdown file was used to identify capture efficiency for each of the size bins and then find the weighted average to produce a single eta value for each run. Datat was then manually imported into the data set (see "data/flume_review_data.csv")
 
 ```{r Fauria Particle Concentration, include=TRUE, warning=FALSE}
 
@@ -25,7 +26,7 @@ setwd("~/flume_synthesis")
 
 #import example data sets
 
-SPC7a <- read.table("~/flume_synthesis/data/Control_7a_09182012_K117.txt", quote="\"", comment.char="") #reading in LISST particle concentration for each bin
+SPC7a <- read.table("~/data/fauria_raw_data/Control_7a_09182012_K117.txt", quote="\"", comment.char="") #reading in LISST particle concentration for each bin
 SPC7b <- read.table("~/flume_synthesis/data/Control_7b_09182012_K117.txt", quote="\"", comment.char="") 
 SPC8a <- read.table("~/flume_synthesis/data/Plants_8a_09192012_K117.txt", quote="\"", comment.char="") 
 SPC8b <- read.table("~/flume_synthesis/data/Plants_8b_09192012_K117.txt", quote="\"", comment.char="") 
@@ -38,7 +39,7 @@ SPC17b <- read.table("~/flume_synthesis/data/Plants_17b_09242012_K117.txt", quot
 SPC18a <- read.table("~/flume_synthesis/data/Plants_18a_09242012_K117.txt", quote="\"", comment.char="") 
 SPC18b <- read.table("~/flume_synthesis/data/Plants_18b_09242012_K117.txt", quote="\"", comment.char="") 
 
-fauria_eta <- read_excel("data/flume_review_data_eta.xlsx", sheet = "Fauria_eta", col_names = FALSE) #reading in eta values for each bin
+fauria_eta <- read_excel("~/data/flume_review_data.xlsx", sheet = "Fauria_eta", col_names = FALSE) #reading in eta values for each bin
 
 #bin <- 1:32
 

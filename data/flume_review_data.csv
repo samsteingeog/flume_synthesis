@@ -1,0 +1,139 @@
+run_ID,paper,Re_c,Calc_Re,d_c,r_c,biofilm,growth_days,growth_cat,c_type,frontal_area,frontal_area_unit_volume,height,eta_not,eta,particle_type,p_density,d_p_cm,d_p_um,f_density,c_density,ave_velocity_cm,radius_ratio,kin_viscosity_cm2,diameter_m,velocity_m
+10192018,ESDL,199.034,No,0.3175,0.15875,no,0,none,Cylindrical wooden pine dowels,0,0.039348291,40,,,Crushed Walnut Shell,1.53,0.0032,32,1,0,6,0.006299213,9.51E-03,0.003175,
+11152018,ESDL,199.034,No,0.3175,0.15875,no,0,none,Cylindrical wooden pine dowels,460.375,0.039348291,40,,0.002534307,Crushed Walnut Shell,1.53,0.0032,32,1,1450,6,0.006299213,9.51E-03,0.003175,0.06
+12042018,ESDL,199.034,No,0.3175,0.15875,yes,20,3,Cylindrical wooden pine dowels,460.375,0.039348291,40,,0.003408386,Crushed Walnut Shell,1.53,0.0032,32,1,1450,6,0.006299213,9.51E-03,0.003175,0.06
+1312019,ESDL,199.034,No,0.3175,0.15875,yes,46,3,Cylindrical wooden pine dowels,460.375,0.039348291,38.5,,0.005424981,Crushed Walnut Shell,1.53,0.0032,32,1,1450,6,0.006299213,9.51E-03,0.003175,0.06
+4172019,ESDL,199.034,No,0.3175,0.15875,no,0,none,Cylindrical wooden pine dowels,0,0.007544017,40,,,Crushed Walnut Shell,1.53,0.0032,32,1,0,6,0.006299213,9.51E-03,0.003175,0.06
+5062019,ESDL,199.034,No,0.3175,0.15875,no,0,none,Cylindrical wooden pine dowels,88.265,0.007544017,40,,0.013213717,Crushed Walnut Shell,1.53,0.0032,32,1,278,6,0.006299213,9.51E-03,0.003175,0.06
+6122019,ESDL,199.034,No,0.3175,0.15875,no,0,none,Cylindrical wooden pine dowels,254,0.021709402,40,,0.004630902,Crushed Walnut Shell,1.53,0.0032,32,1,800,6,0.006299213,9.51E-03,0.003175,0.06
+7012019,ESDL,199.034,No,0.3175,0.15875,yes,18,3,Cylindrical wooden pine dowels,254,0.021709402,40,,0.005676627,Crushed Walnut Shell,1.53,0.0032,32,1,800,6,0.006299213,9.51E-03,0.003175,0.06
+7292019,ESDL,68.148,No,0.3175,0.15875,no,0,none,Cylindrical wooden pine dowels,0,0.021709402,40,,,Crushed Walnut Shell,1.53,0.0032,32,1,0,2,0.006299213,9.51E-03,0.003175,
+8082019,ESDL,133.591,No,0.3175,0.15875,no,0,none,Cylindrical wooden pine dowels,0,0.006295726,40,,,Crushed Walnut Shell,1.53,0.0032,32,1,0,4,0.006299213,9.51E-03,0.003175,0.02
+9052019,ESDL,68.148,No,0.3175,0.15875,no,0,none,Cylindrical wooden pine dowels,88.265,0.007544017,40,,0.036324083,Crushed Walnut Shell,1.53,0.0032,32,1,278,2,0.006299213,9.51E-03,0.003175,0.02
+9182019,ESDL,199.034,No,0.3175,0.15875,yes,13,3,Cylindrical wooden pine dowels,88.265,0.007544017,40,,0.017899283,Crushed Walnut Shell,1.53,0.0032,32,1,278,6,0.006299213,9.51E-03,0.003175,0.06
+9262019,ESDL,133.591,No,0.3175,0.15875,no,0,none,Cylindrical wooden pine dowels,88.265,0.007544017,40,,0.020101424,Crushed Walnut Shell,1.53,0.0032,32,1,278,4,0.006299213,9.51E-03,0.003175,0.04
+10292019,ESDL,68.148,No,0.3175,0.15875,no,0,none,Cylindrical wooden pine dowels,254,0.021709402,40,,0.009155923,Crushed Walnut Shell,1.53,0.0032,32,1,800,2,0.006299213,9.51E-03,0.003175,0.02
+1282020,ESDL,199.034,No,0.3175,0.15875,yes,30,3,Cylindrical wooden pine dowels,88.265,0.007544017,40,,0.017321808,Crushed Walnut Shell,1.53,0.0032,32,1,278,6,0.006299213,9.51E-03,0.003175,0.06
+2112020,ESDL,133.591,No,0.3175,0.15875,no,0,none,Cylindrical wooden pine dowels,254,0.021709402,40,,0.007883958,Crushed Walnut Shell,1.53,0.0032,32,1,800,4,0.006299213,9.51E-03,0.003175,0.04
+3032020,ESDL,68.148,No,0.3175,0.15875,no,0,none,Cylindrical wooden pine dowels,460.375,0.039348291,40,,0.006051331,Crushed Walnut Shell,1.53,0.0032,32,1,1450,2,0.006299213,9.51E-03,0.003175,0.02
+3132020,ESDL,133.591,No,0.3175,0.15875,no,0,none,Cylindrical wooden pine dowels,460.375,0.039348291,40,,0.00447515,Crushed Walnut Shell,1.53,0.0032,32,1,1450,4,0.006299213,9.51E-03,0.003175,0.04
+16a13,Fauria_2014,58.22,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,14,,0.000847949,road dust,2.3,0.00099,9.9,1,7209,1.9,0.0033,9.79E-03,0.003,0.019
+16a14,Fauria_2014,58.22,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,14,,0.001299118,road dust,2.3,0.00117,11.7,1,7209,1.9,0.0039,9.79E-03,0.003,0.019
+16a15,Fauria_2014,58.22,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,14,,0.001589297,road dust,2.3,0.00138,13.8,1,7209,1.9,0.0046,9.79E-03,0.003,0.019
+16b13,Fauria_2014,55.16,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,14.3,,0.000903357,road dust,2.3,0.00099,9.9,1,7209,1.8,0.0033,9.79E-03,0.003,0.018
+16b14,Fauria_2014,55.16,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,14.3,,0.001237645,road dust,2.3,0.00117,11.7,1,7209,1.8,0.0039,9.79E-03,0.003,0.018
+16b15,Fauria_2014,55.16,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,14.3,,0.001406896,road dust,2.3,0.00138,13.8,1,7209,1.8,0.0046,9.79E-03,0.003,0.018
+17a13,Fauria_2014,144.02,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,15,,0.000432999,road dust,2.3,0.00099,9.9,1,7209,4.7,0.0033,9.79E-03,0.003,0.047
+17a14,Fauria_2014,144.02,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,15,,0.000553612,road dust,2.3,0.00117,11.7,1,7209,4.7,0.0039,9.79E-03,0.003,0.047
+17a15,Fauria_2014,144.02,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,15,,0.000638563,road dust,2.3,0.00138,13.8,1,7209,4.7,0.0046,9.79E-03,0.003,0.047
+17b13,Fauria_2014,144.02,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,15.1,,0.000460817,road dust,2.3,0.00099,9.9,1,7209,4.7,0.0033,9.79E-03,0.003,0.047
+17b14,Fauria_2014,144.02,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,15.1,,0.00057804,road dust,2.3,0.00117,11.7,1,7209,4.7,0.0039,9.79E-03,0.003,0.047
+17b15,Fauria_2014,144.02,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,15.1,,0.000656126,road dust,2.3,0.00138,13.8,1,7209,4.7,0.0046,9.79E-03,0.003,0.047
+18a13,Fauria_2014,183.86,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,16.7,,0.000280824,road dust,2.3,0.00099,9.9,1,7209,6,0.0033,9.79E-03,0.003,0.06
+18a14,Fauria_2014,183.86,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,16.7,,0.000291132,road dust,2.3,0.00117,11.7,1,7209,6,0.0039,9.79E-03,0.003,0.06
+18a15,Fauria_2014,183.86,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,16.7,,0.000286171,road dust,2.3,0.00138,13.8,1,7209,6,0.0046,9.79E-03,0.003,0.06
+18b13,Fauria_2014,183.86,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,16.7,,0.000349942,road dust,2.3,0.00099,9.9,1,7209,6,0.0033,9.79E-03,0.003,0.06
+18b14,Fauria_2014,183.86,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,16.7,,0.000343629,road dust,2.3,0.00117,11.7,1,7209,6,0.0039,9.79E-03,0.003,0.06
+18b15,Fauria_2014,183.86,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,16.7,,0.000317032,road dust,2.3,0.00138,13.8,1,7209,6,0.0046,9.79E-03,0.003,0.06
+7a13,Fauria_2014,55.16,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,14.7,,0.000916464,road dust,2.3,0.00099,9.9,1,7209,1.8,0.0033,9.79E-03,0.003,0.018
+7a14,Fauria_2014,55.16,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,14.7,,0.001084977,road dust,2.3,0.00117,11.7,1,7209,1.8,0.0039,9.79E-03,0.003,0.018
+7a15,Fauria_2014,55.16,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,14.7,,0.001212598,road dust,2.3,0.00138,13.8,1,7209,1.8,0.0046,9.79E-03,0.003,0.018
+7b13,Fauria_2014,55.16,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,14.7,,0.000728988,road dust,2.3,0.00099,9.9,1,7209,1.8,0.0033,9.79E-03,0.003,0.018
+7b14,Fauria_2014,55.16,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,14.7,,0.000863272,road dust,2.3,0.00117,11.7,1,7209,1.8,0.0039,9.79E-03,0.003,0.018
+7b15,Fauria_2014,55.16,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,14.7,,0.000963069,road dust,2.3,0.00138,13.8,1,7209,1.8,0.0046,9.79E-03,0.003,0.018
+8a13,Fauria_2014,134.83,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,15.9,,0.000318213,road dust,2.3,0.00099,9.9,1,7209,4.4,0.0033,9.79E-03,0.003,0.044
+8a14,Fauria_2014,134.83,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,15.9,,0.000396459,road dust,2.3,0.00117,11.7,1,7209,4.4,0.0039,9.79E-03,0.003,0.044
+8a15,Fauria_2014,134.83,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,15.9,,0.000436525,road dust,2.3,0.00138,13.8,1,7209,4.4,0.0046,9.79E-03,0.003,0.044
+8b13,Fauria_2014,134.83,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,15.8,,0.000202555,road dust,2.3,0.00099,9.9,1,7209,4.4,0.0033,9.79E-03,0.003,0.044
+8b14,Fauria_2014,134.83,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,15.8,,0.000208646,road dust,2.3,0.00117,11.7,1,7209,4.4,0.0039,9.79E-03,0.003,0.044
+8b15,Fauria_2014,134.83,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,15.8,,0.000183938,road dust,2.3,0.00138,13.8,1,7209,4.4,0.0046,9.79E-03,0.003,0.044
+9a13,Fauria_2014,180.8,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,17,,0.000183289,road dust,2.3,0.00099,9.9,1,7209,5.9,0.0033,9.79E-03,0.003,0.059
+9a14,Fauria_2014,180.8,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,17,,0.000240838,road dust,2.3,0.00117,11.7,1,7209,5.9,0.0039,9.79E-03,0.003,0.059
+9a15,Fauria_2014,180.8,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,17,,0.000287752,road dust,2.3,0.00138,13.8,1,7209,5.9,0.0046,9.79E-03,0.003,0.059
+9b13,Fauria_2014,180.8,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,17.1,,0.000173787,road dust,2.3,0.00099,9.9,1,7209,5.9,0.0033,9.79E-03,0.003,0.059
+9b14,Fauria_2014,180.8,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,17.1,,0.000183435,road dust,2.3,0.00117,11.7,1,7209,5.9,0.0039,9.79E-03,0.003,0.059
+9b15,Fauria_2014,180.8,yes,0.3,0.15,yes,7,1,7209 stems m?2 with biofilm,2162.7,0.059512933,17.1,,0.000166249,road dust,2.3,0.00138,13.8,1,7209,5.9,0.0046,9.79E-03,0.003,0.059
+1,Palmer_2004,68,no,0.635,0.3175,no,0,none,Smooth,0.635,0.000104959,9.75,,0.0035,Plastic resin,1.03,0.0194,194,1,1,1.048774173,0.030551181,9.79E-03,0.00635,0.010487742
+2,Palmer_2004,137,no,1.27,0.635,no,0,none,Smooth,1.27,0.000209917,9.75,,0.0014,Plastic resin,1.03,0.0194,194,1,1,1.056485748,0.015275591,9.79E-03,0.0127,0.010564857
+3,Palmer_2004,279,no,2.54,1.27,no,0,none,Smooth,2.54,0.000419835,9.75,,0.0005,Plastic resin,1.03,0.0194,194,1,1,1.075764685,0.007637795,9.79E-03,0.0254,0.010757647
+4,Palmer_2004,38,no,0.635,0.3175,no,0,none,Smooth,0.635,0.000104959,9.75,,0.0021,Plastic resin,1.03,0.0194,194,1,1,0.586079685,0.030551181,9.79E-03,0.00635,0.005860797
+5,Palmer_2004,76,no,1.27,0.635,no,0,none,Smooth,1.27,0.000209917,9.75,,0.00094,Plastic resin,1.03,0.0194,194,1,1,0.586079685,0.015275591,9.79E-03,0.0127,0.005860797
+6,Palmer_2004,149,no,2.54,1.27,no,0,none,Smooth,2.54,0.000419835,9.75,,0.00032,Plastic resin,1.03,0.0194,194,1,1,0.574512323,0.007637795,9.79E-03,0.0254,0.005745123
+7,Palmer_2004,115,no,0.635,0.3175,no,0,none,Smooth,0.635,0.000104959,9.75,,0.0048,Plastic resin,1.03,0.0194,194,1,1,1.773662205,0.030551181,9.79E-03,0.00635,0.017736622
+8,Palmer_2004,239,no,1.27,0.635,no,0,none,Smooth,1.27,0.000209917,9.75,,0.0019,Plastic resin,1.03,0.0194,194,1,1,1.843066378,0.015275591,9.79E-03,0.0127,0.018430664
+9,Palmer_2004,486,no,2.54,1.27,no,0,none,Smooth,2.54,0.000419835,9.75,,0.00077,Plastic resin,1.03,0.0194,194,1,1,1.873912677,0.007637795,9.79E-03,0.0254,0.018739127
+10,Palmer_2004,233,no,1.27,0.635,no,0,none,Rough L,1.27,0.000209917,9.75,,0.0027,Plastic resin,1.03,0.0194,194,1,1,1.796796929,0.015275591,9.79E-03,0.0127,0.017967969
+11,Palmer_2004,239,no,1.27,0.635,no,0,none,Rough H,1.27,0.000209917,9.75,,0.0042,Plastic resin,1.03,0.0194,194,1,1,1.843066378,0.015275591,9.79E-03,0.0127,0.018430664
+12,Palmer_2004,130,no,1.27,0.635,no,0,none,Rough L,1.27,0.000209917,9.75,,0.0026,Plastic resin,1.03,0.0194,194,1,1,1.002504724,0.015275591,9.79E-03,0.0127,0.010025047
+1.1,Purich_2006,73.73,No,0.63,0.315,no,0,none,dowels in grease,305,0.063316583,4,,0.002755732,pliolite particles,1.03,0.0231,231,1.025,500,1.12,0.036666667,9.79E-03,0.0063,0.0112
+1.2,Purich_2006,188.28,No,0.63,0.315,no,0,none,dowels in grease,305,0.063316583,4,,0.001770942,pliolite particles,1.03,0.0231,231,1.025,500,2.86,0.036666667,9.79E-03,0.0063,0.0286
+1.3,Purich_2006,261.35,No,0.63,0.315,no,0,none,dowels in grease,305,0.063316583,4,,0.00138543,pliolite particles,1.03,0.0231,231,1.025,500,3.97,0.036666667,9.79E-03,0.0063,0.0397
+1.4,Purich_2006,422.64,No,0.63,0.315,no,0,none,dowels in grease,305,0.063316583,4,,0.001836714,pliolite particles,1.03,0.0231,231,1.025,500,6.42,0.036666667,9.79E-03,0.0063,0.0642
+1.5,Purich_2006,506.9,No,0.63,0.315,no,0,none,dowels in grease,305,0.063316583,4,,0.001850002,pliolite particles,1.03,0.0231,231,1.025,500,7.7,0.036666667,9.79E-03,0.0063,0.077
+1.6,Purich_2006,598.41,No,0.63,0.315,no,0,none,dowels in grease,305,0.063316583,4,,0.002237482,pliolite particles,1.03,0.0231,231,1.025,500,9.09,0.036666667,9.79E-03,0.0063,0.0909
+2.1,Purich_2006,72.41,No,0.63,0.315,no,0,none,dowels in grease,610,0.126633166,4,,0.006439034,pliolite particles,1.03,0.0231,231,1.025,1000,1.1,0.036666667,9.79E-03,0.0063,0.011
+2.2,Purich_2006,188.28,No,0.63,0.315,no,0,none,dowels in grease,610,0.126633166,4,,0.004648723,pliolite particles,1.03,0.0231,231,1.025,1000,2.86,0.036666667,9.79E-03,0.0063,0.0286
+2.3,Purich_2006,289,No,0.63,0.315,no,0,none,dowels in grease,610,0.126633166,4,,0.003407122,pliolite particles,1.03,0.0231,231,1.025,1000,4.39,0.036666667,9.79E-03,0.0063,0.0439
+2.4,Purich_2006,357.46,No,0.63,0.315,no,0,none,dowels in grease,610,0.126633166,4,,0.004066256,pliolite particles,1.03,0.0231,231,1.025,1000,5.43,0.036666667,9.79E-03,0.0063,0.0543
+2.5,Purich_2006,449.63,No,0.63,0.315,no,0,none,dowels in grease,610,0.126633166,4,,0.00183074,pliolite particles,1.03,0.0231,231,1.025,1000,6.83,0.036666667,9.79E-03,0.0063,0.0683
+2.6,Purich_2006,670.16,No,0.63,0.315,no,0,none,dowels in grease,610,0.126633166,4,,0.00204844,pliolite particles,1.03,0.0231,231,1.025,1000,10.18,0.036666667,9.79E-03,0.0063,0.1018
+3.1,Purich_2006,117.84,No,0.63,0.315,no,0,none,dowels in grease,1220,0.253266332,4,,0.0003758,pliolite particles,1.03,0.0231,231,1.025,2000,1.79,0.036666667,9.79E-03,0.0063,0.0179
+3.2,Purich_2006,154.7,No,0.63,0.315,no,0,none,dowels in grease,1220,0.253266332,4,,0.00131337,pliolite particles,1.03,0.0231,231,1.025,2000,2.35,0.036666667,9.79E-03,0.0063,0.0235
+3.3,Purich_2006,240.28,No,0.63,0.315,no,0,none,dowels in grease,1220,0.253266332,4,,0.000368592,pliolite particles,1.03,0.0231,231,1.025,2000,3.65,0.036666667,9.79E-03,0.0063,0.0365
+3.4,Purich_2006,370.63,No,0.63,0.315,no,0,none,dowels in grease,1220,0.253266332,4,,0.000302218,pliolite particles,1.03,0.0231,231,1.025,2000,5.63,0.036666667,9.79E-03,0.0063,0.0563
+3.5,Purich_2006,573.39,No,0.63,0.315,no,0,none,dowels in grease,1220,0.253266332,4,,0.000258951,pliolite particles,1.03,0.0231,231,1.025,2000,8.71,0.036666667,9.79E-03,0.0063,0.0871
+3.6,Purich_2006,653.05,No,0.63,0.315,no,0,none,dowels in grease,1220,0.253266332,4,,0.000179499,pliolite particles,1.03,0.0231,231,1.025,2000,9.92,0.036666667,9.79E-03,0.0063,0.0992
+I.1,Wu_2011,0.41,yes,2,1,yes,0,none,Glass cylinders with silicone grease,2,0.01,1,0.0064,0.0064,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.002,0.0000525,9.79E-03,0.02,0.00002
+I.2,Wu_2011,0.82,yes,2,1,yes,0,none,Glass cylinders with silicone grease,2,0.01,1,0.0033,0.0033,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.004,0.0000525,9.79E-03,0.02,0.00004
+I.3,Wu_2011,1.63,yes,2,1,yes,0,none,Glass cylinders with silicone grease,2,0.01,1,0.0017,0.0017,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.008,0.0000525,9.79E-03,0.02,0.00008
+I.4,Wu_2011,2.04,yes,2,1,yes,0,none,Glass cylinders with silicone grease,2,0.01,1,0.0014,0.0014,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.01,0.0000525,9.79E-03,0.02,0.0001
+I.5,Wu_2011,4.08,yes,2,1,yes,0,none,Glass cylinders with silicone grease,2,0.01,1,0.00069,0.00069,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.02,0.0000525,9.79E-03,0.02,0.0002
+I.6,Wu_2011,8.17,yes,2,1,yes,0,none,Glass cylinders with silicone grease,2,0.01,1,0.00035,0.00035,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.04,0.0000525,9.79E-03,0.02,0.0004
+I.7,Wu_2011,16.34,yes,2,1,yes,0,none,Glass cylinders with silicone grease,2,0.01,1,0.00018,0.00018,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.08,0.0000525,9.79E-03,0.02,0.0008
+I.8,Wu_2011,20.42,yes,2,1,yes,0,none,Glass cylinders with silicone grease,2,0.01,1,0.00014,0.00014,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.1,0.0000525,9.79E-03,0.02,0.001
+I.9,Wu_2011,40.84,yes,2,1,yes,0,none,Glass cylinders with silicone grease,2,0.01,1,0.000073,0.000073,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.2,0.0000525,9.79E-03,0.02,0.002
+II.1,Wu_2011,4.08,yes,2,1,yes,0,none,Glass cylinders with silicone grease,2,0.01,1,0.00082,0.00082,flourescent latex microspheres,1.05,0.00001,0.1,1,1,0.02,0.000005,9.79E-03,0.02,0.0002
+II.2,Wu_2011,2.04,yes,1,0.5,yes,0,none,Glass cylinders with silicone grease,1,0.005,1,0.0015,0.0015,flourescent latex microspheres,1.05,0.00001,0.1,1,1,0.02,0.00001,9.79E-03,0.01,0.0002
+II.3,Wu_2011,2.04,yes,1,0.5,yes,0,none,Glass cylinders with silicone grease,1,0.005,1,0.0011,0.0011,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.02,0.000105,9.79E-03,0.01,0.0002
+II.4,Wu_2011,4.08,yes,2,1,yes,0,none,Glass cylinders with silicone grease,2,0.01,1,0.00074,0.00074,flourescent latex microspheres,1.05,0.0002,2,1,1,0.02,0.0001,9.79E-03,0.02,0.0002
+II.5,Wu_2011,2.04,yes,1,0.5,yes,0,none,Glass cylinders with silicone grease,1,0.005,1,0.0012,0.0012,flourescent latex microspheres,1.05,0.0002,2,1,1,0.02,0.0002,9.79E-03,0.01,0.0002
+II.6,Wu_2011,4.08,yes,2,1,yes,0,none,Glass cylinders with silicone grease,2,0.01,1,0.0011,0.0011,flourescent latex microspheres,1.05,0.00105,10.5,1,1,0.02,0.000525,9.79E-03,0.02,0.0002
+II.7,Wu_2011,2.04,yes,1,0.5,yes,0,none,Glass cylinders with silicone grease,1,0.005,1,0.0021,0.0021,flourescent latex microspheres,1.05,0.00105,10.5,1,1,0.02,0.00105,9.79E-03,0.01,0.0002
+I.1,Wu_2012,1.02,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.02,0.00021,9.79E-03,0.005,0.0002
+I.10,Wu_2012,1.02,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.00001,0.1,1,1,0.02,0.00002,9.79E-03,0.005,0.0002
+I.2,Wu_2012,1.02,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.02,0.00021,9.79E-03,0.005,0.0002
+I.3,Wu_2012,1.02,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.02,0.00021,9.79E-03,0.005,0.0002
+I.4,Wu_2012,1.02,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.02,0.00021,9.79E-03,0.005,0.0002
+I.5,Wu_2012,1.02,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.02,0.00021,9.79E-03,0.005,0.0002
+I.6,Wu_2012,1.02,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.00001,0.1,1,1,0.02,0.00002,9.79E-03,0.005,0.0002
+I.7,Wu_2012,1.02,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.00001,0.1,1,1,0.02,0.00002,9.79E-03,0.005,0.0002
+I.8,Wu_2012,1.02,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.00001,0.1,1,1,0.02,0.00002,9.79E-03,0.005,0.0002
+I.9,Wu_2012,1.02,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.00001,0.1,1,1,0.02,0.00002,9.79E-03,0.005,0.0002
+II.1,Wu_2012,0.01,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.0002,0.00021,9.79E-03,0.005,0.000002
+II.10,Wu_2012,0.1,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.00001,0.1,1,1,0.002,0.00002,9.79E-03,0.005,0.00002
+II.11,Wu_2012,10.21,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.00001,0.1,1,1,0.2,0.00002,9.79E-03,0.005,0.002
+II.12,Wu_2012,51.05,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.00001,0.1,1,1,1,0.00002,9.79E-03,0.005,0.01
+II.13,Wu_2012,0.01,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.00001,0.1,1,1,0.0002,0.00002,9.79E-03,0.005,0.000002
+II.14,Wu_2012,0.1,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.00001,0.1,1,1,0.002,0.00002,9.79E-03,0.005,0.00002
+II.15,Wu_2012,10.21,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.00001,0.1,1,1,0.2,0.00002,9.79E-03,0.005,0.002
+II.16,Wu_2012,51.05,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.00001,0.1,1,1,1,0.00002,9.79E-03,0.005,0.01
+II.2,Wu_2012,0.1,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.002,0.00021,9.79E-03,0.005,0.00002
+II.3,Wu_2012,10.21,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.2,0.00021,9.79E-03,0.005,0.002
+II.4,Wu_2012,51.05,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.000105,1.05,1,1,1,0.00021,9.79E-03,0.005,0.01
+II.5,Wu_2012,0.01,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.0002,0.00021,9.79E-03,0.005,0.000002
+II.6,Wu_2012,0.1,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.002,0.00021,9.79E-03,0.005,0.00002
+II.7,Wu_2012,10.21,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.000105,1.05,1,1,0.2,0.00021,9.79E-03,0.005,0.002
+II.8,Wu_2012,51.05,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.000105,1.05,1,1,1,0.00021,9.79E-03,0.005,0.01
+II.9,Wu_2012,0.01,yes,0.5,0.25,,0,none,Glass cylinder with no coating,0.5,0.0025,1,,,flourescent latex microspheres,1.05,0.00001,0.1,1,1,0.0002,0.00002,9.79E-03,0.005,0.000002
+I.1-1,Wu_2014,0.024514811,yes,0.120000001,0.06,yes,10,2,brown top millet,0.763500003,0.002,1.5,,0.020956123,flourescent latex microspheres,1.05,0.000105,1.05,1,2545,0.002,0.000875,0.00979,,
+I.1-2,Wu_2014,0.122574056,yes,0.120000001,0.06,yes,10,2,brown top millet,0.763500003,0.01,1.5,,0.00248854,flourescent latex microspheres,1.05,0.000105,1.05,1,2545,0.01,0.000875,0.00979,,
+I.1-3,Wu_2014,0.612870278,yes,0.120000001,0.06,yes,10,2,brown top millet,0.763500003,0.05,1.5,,0.000233137,flourescent latex microspheres,1.05,0.000105,1.05,1,2545,0.05,0.000875,0.00979,,
+I.1-4,Wu_2014,1.225740557,yes,0.120000001,0.06,yes,10,2,brown top millet,0.763500003,0.1,1.5,,9.17E-05,flourescent latex microspheres,1.05,0.000105,1.05,1,2545,0.1,0.000875,0.00979,,
+I.2-1,Wu_2014,0.024514811,yes,0.120000001,0.06,yes,10,2,brown top millet,1.470000006,0.002,1.5,,0.044217687,flourescent latex microspheres,1.05,0.000105,1.05,1,4900,0.002,0.000875,0.00979,,
+I.2-2,Wu_2014,0.122574056,yes,0.120000001,0.06,yes,10,2,brown top millet,1.470000006,0.01,1.5,,0.004285714,flourescent latex microspheres,1.05,0.000105,1.05,1,4900,0.01,0.000875,0.00979,,
+I.2-3,Wu_2014,0.612870278,yes,0.120000001,0.06,yes,10,2,brown top millet,1.470000006,0.05,1.5,,0.000163265,flourescent latex microspheres,1.05,0.000105,1.05,1,4900,0.05,0.000875,0.00979,,
+I.2-4,Wu_2014,1.225740557,yes,0.120000001,0.06,yes,10,2,brown top millet,1.470000006,0.1,1.5,,6.26E-05,flourescent latex microspheres,1.05,0.000105,1.05,1,4900,0.1,0.000875,0.00979,,
+I.3-1,Wu_2014,0.024514811,yes,0.120000001,0.06,yes,10,2,brown top millet,2.455200011,0.002,1.5,,0.038693385,flourescent latex microspheres,1.05,0.000105,1.05,1,8184,0.002,0.000875,0.00979,,
+I.3-2,Wu_2014,0.122574056,yes,0.120000001,0.06,yes,10,2,brown top millet,2.455200011,0.01,1.5,,0.007331378,flourescent latex microspheres,1.05,0.000105,1.05,1,8184,0.01,0.000875,0.00979,,
+I.3-3,Wu_2014,0.612870278,yes,0.120000001,0.06,yes,10,2,brown top millet,2.455200011,0.05,1.5,,0.000676116,flourescent latex microspheres,1.05,0.000105,1.05,1,8184,0.05,0.000875,0.00979,,
+I.3-4,Wu_2014,1.225740557,yes,0.120000001,0.06,yes,10,2,brown top millet,2.455200011,0.1,1.5,,8.55E-05,flourescent latex microspheres,1.05,0.000105,1.05,1,8184,0.1,0.000875,0.00979,,
