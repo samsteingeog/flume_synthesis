@@ -529,7 +529,7 @@ lm_eqn <- function(data){
               c2 = format(unname(coef(m)[3]), digits = 2),
               c3 = format(unname(coef(m)[4]), digits = 2),
               c4 = format(unname(coef(m)[5]), digits = 2),
-              c5 = format(unname(coef(m)[6]), digits = 2),
+              #c5 = format(unname(coef(m)[6]), digits = 2),
               r2 = format(summary(m)$r.squared, digits = 3)))
     as.character(as.expression(eq));
 }
@@ -562,6 +562,7 @@ lm_eqn2 <- function(data, control){
 #Text for plots
 xlablog = expression(paste("observed ln(", eta, ")"))
 ylablog = expression(paste("predicted ln(",  eta, ")"))
+Retext = expression(paste("Re"[c]))
 
 #Predict values for entire data set 
 logdata$predlogeta <- predict(total_lm)
@@ -620,15 +621,14 @@ ggplot(logdata, aes(x = logY, y = prednoc1)) +
 dev.off()
 
 logdata$prednoc5 <- predict(noc5_lm)
-png("graphics/noc5.png")
-ggplot(logdata, aes(x = logY, y = prednoc5)) + 
+noc5plot <- ggplot(logdata, aes(x = logY, y = prednoc5)) + 
   geom_smooth(method = "lm", color = "black") +
-  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
-  theme_minimal() + 
-  labs(title = "All Runs", y = "predicted eta", x = "observed eta") +
-  geom_text(x = -8, y = -5, label = lm_eqn(logdata), parse = TRUE, size = 5) +
-  scale_color_viridis_c(option = "C", direction = -1)
-dev.off()
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c, alpha = 0.6, size = 3)) +
+  theme_pubclean() + 
+  theme(legend.position = "right") +
+  labs(y = ylablog, x = xlablog) +
+  geom_text(x = -8.5, y = -4.5, label = lm_eqn(logdata), parse = TRUE, size = 5) +
+  scale_color_viridis_c(option = "C", direction = 1, name = Retext)
 
 ```
 
@@ -686,6 +686,8 @@ resplit <- ggarrange(Re1_plot, Re2_plot)
 ggsave(file = "graphics/re_split.png", plot = resplit)
 
 ggsave(file = "graphics/all2.png", plot = all2)
+
+ggsave(file = "graphics/noc5plot.png", plot = noc5plot)
 
 ```
 
@@ -1272,7 +1274,7 @@ Palmer <- function(Re, #Reynolds Number Re_c
   eta <- (0.224*(Re**0.718)*(R**2.08))
   logeta <- log(eta)
   
-  return(eta) #adjust to return either eta or ln(eta)
+  return(logeta) #adjust to return either eta or ln(eta)
 }
 
 logdata$palmer <- Palmer(Re = logdata$Re_c, R = logdata$radius_ratio)
@@ -1287,9 +1289,9 @@ palmer_r2 <- cor(logdata$logY, logdata$palmer)**2  #0.000
 
 #Residuals
 
-(mean((logdata$predeta-logdata$eta)**2))**(1/2) #for comparison: 0.002 mean residual from the synthesis model
+(mean((logdata$predlogeta-logdata$logY)**2))**(1/2) #for comparison: 0.002 mean residual from the synthesis model; 0.533 for log(eta)
 
-palmer_rmse <- (mean((logdata$palmer-logdata$eta)**2))**(1/2) #10.17 mean residual
+palmer_rmse <- (mean((logdata$palmer-logdata$logY)**2))**(1/2) #10.17 mean residual for eta; 5.00 for log(eta)
 ```
 
 ```{r fit Fauria eqn}
@@ -1301,7 +1303,7 @@ Fauria <- function(Re, #Reynolds Number Re_c
   eta <- (2.06*(Re**-1.14)*(R**0.65))
   logeta <- log(eta)
   
-  return(eta) #adjust to return either eta or ln(eta)
+  return(logeta) #adjust to return either eta or ln(eta)
 }
 
 logdata$fauria <- Fauria(Re = logdata$Re_c, R = logdata$radius_ratio)
@@ -1311,11 +1313,11 @@ Re2$fauria <- Fauria(Re = Re2$Re_c, R = Re2$radius_ratio)
 
 #R2 values
 
-fauria_r2 <- cor(logdata$logY, logdata$fauria)**2  #0.31 ; same ; same
+fauria_r2 <- cor(logdata$logY, logdata$fauria)**2  #0.31 ; 0.075
 
 #Residuals
 
-fauria_rmse <- (mean((logdata$fauria-logdata$eta)**2))**(1/2) #7.61 mean residual
+fauria_rmse <- (mean((logdata$fauria-logdata$logY)**2))**(1/2) #7.61 mean residual; 2.47 for log(eta)
 ```
 
 ```{r Eqn comparison plots}
@@ -1376,21 +1378,21 @@ ggsave(file = "graphics/all_eqn_panel.png", plot = comp3plot)
 #uncomment this section for eta
 
 gather_a <- logdata %>%
-  dplyr::select(c(Re_c, eta, predeta)) %>% #just the pertinent variables
+  dplyr::select(c(Re_c, logY, predlogeta)) %>% #just the pertinent variables
   mutate(author = "This paper") %>% #set author name to label on plot later
-  mutate(predeta = as.numeric(predeta)) #change from named numeric to numeric
+  mutate(predlogeta = as.numeric(predlogeta)) #change from named numeric to numeric
 
 gather_b <- logdata %>%
-  dplyr::select(c(Re_c, eta, palmer)) %>%
-  rename(predeta = palmer) %>% #change variable name to match for later rbind
+  dplyr::select(c(Re_c, logY, palmer)) %>%
+  rename(predlogeta = palmer) %>% #change variable name to match for later rbind
   mutate(author = "Palmer") %>%
-  mutate(predeta = as.numeric(predeta))
+  mutate(predlogeta = as.numeric(predlogeta))
 
 gather_c <- logdata %>%
-  dplyr::select(c(Re_c, eta, fauria)) %>%
-  rename(predeta = fauria) %>%
+  dplyr::select(c(Re_c, logY, fauria)) %>%
+  rename(predlogeta = fauria) %>%
   mutate(author = "Fauria") %>%
-  mutate(predeta = as.numeric(predeta))
+  mutate(predlogeta = as.numeric(predlogeta))
 
 gather_data <- rbind(gather_a, gather_b, gather_c) #put into same dataframe
 
@@ -1401,14 +1403,14 @@ ylablog = expression(paste("predicted ln(",  eta, ")"))
 xlab = expression(paste("observed ", eta))
 ylab = expression(paste("predicted ",  eta))
 
-comp1plot <- ggplot(gather_data) + geom_point(aes(y = predeta, x = eta, color = Re_c, shape = author), size = 6, alpha = 0.6) +
-  labs(x = xlab, y = ylab) +
- # lims(x = c(-15, 0)) +
-  lims(y = c(0, 0.05)) +
+comp1plot <- ggplot(gather_data) + geom_point(aes(y = predlogeta, x = logY, color = Re_c, shape = author), size = 6, alpha = 0.6) +
+  labs(x = xlablog, y = ylablog) +
+  lims(x = c(-12, 0)) +
+ # lims(y = c(0, 0.045), x = c(0,0.045)) +
   theme_pubclean() +
-  scale_color_viridis_c(option = "plasma", direction = 1)
+  scale_color_viridis_c(option = "plasma", direction = 1, name = Retext)
 
-ggsave(filename = "graphics/all_eqn_nonlog_b.png", plot = comp1plot)
+ggsave(filename = "graphics/all_eqn_log.png", plot = comp1plot)
 
 #All eqns with Re regime split
 
