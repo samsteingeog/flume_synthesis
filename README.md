@@ -24,10 +24,12 @@ The repo contains the following files:
 
 * /data:
   + flume_review_data.csv: experimental flume data for fitting the model
-  + mudd_data.csv: data set to recreate Mudd et al., 2010 Figure 5 using our new functional form
+  + mudd_data.csv: data set to recreate Mudd et al., 2010 Figure 5 using our new functional form for particle capture
   + data_40.csv: data set of typical marsh flow and vegetation conditions w/ 40um sized particles 
   
 * /scripts:
   + flume_model.Rmd: markdown file to fit the above eqn and integrate it into the model for marsh elevation change presented in Mudd et al., 2010. 
 
+References:
 
+Mudd, S.M.;  D’Alpaos, A.;  Morris, J.T.   How does vegetation affect sedimentation on tidal marshes? Investigating particle capture and hydrodynamic controls on biologically mediated sedimentation. *Journal of Geophysical Research: Earth Surface* 2010, *115*, 1–14.  doi:10.1029/2009JF001566.
