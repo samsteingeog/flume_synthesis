@@ -5,18 +5,18 @@
 ### Updated on: 12/11/2019
 
 
-This repository contains code to fit the following formula (from Larsen 2014): 
+This repository contains code to fit the following formula (from Stein et al., *in prep*): 
 
-!["\begin{\eta_{0} \undertilde (\frac{Re_{S}}{\sqrt{(ah)(1-ad)}})^{c1}R^{*c2}(ad)^{c3}P^{c4}}"](C:\Users\samps\OneDrive\Documents\flume_synthesis\eqn_1.png)
+ $ \ln (\eta) \sim c_{0} + c_{1}\ln \left( \frac{\text{Re}_{c}}{\sqrt{ah(1-ad_{c})}} \right) + c_{2}\ln(ad_{c}) + c_{3}\ln(\text{P}) + c_{4}\ln(\text{R}^{\ast}) $
 
 This code calls the following variables: 
 
 | Variable | Symbol | Unit |
 | ------ | ------ | ----- |
-| Collector Reynolds Number | Re_C | N/A |
-| Frontal Area per Unit Volume | *a* | cm^-1
-| Collector Height | *h* | cm
-| Collector Diameter | *d* | cm
+| Collector Reynolds Number | Re$_{c}$ | N/A |
+| Frontal Area per Unit Volume | *a* | L$^{-1}$
+| Collector Height | *h* | L
+| Collector Diameter | *d$_{c}$* | L
 | Particle - Collector Radius Ratio | R* | N/A
 | Particle - Water Density Ratio | P | N/A
 | Capture Efficiency | eta (*n*)  | N/A
