@@ -13,10 +13,10 @@ This code calls the following variables:
 
 | Variable | Symbol | Unit |
 | ------ | ------ | ----- |
-| Collector Reynolds Number | Re$_{c}$ | N/A |
-| Frontal Area per Unit Volume | *a* | L$^{-1}$
+| Collector Reynolds Number | Re_c | N/A |
+| Frontal Area per Unit Volume | *a* | L^-1
 | Collector Height | *h* | L
-| Collector Diameter | *d$_{c}$* | L
+| Collector Diameter | *d_c* | L
 | Particle - Collector Radius Ratio | R* | N/A
 | Particle - Water Density Ratio | P | N/A
 | Capture Efficiency | eta (*n*)  | N/A
