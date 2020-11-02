@@ -9,6 +9,8 @@ This repository contains code to fit the following formula (from Stein et al., *
 
  $ \ln (\eta) \sim c_{0} + c_{1}\ln \left( \frac{\text{Re}_{c}}{\sqrt{ah(1-ad_{c})}} \right) + c_{2}\ln(ad_{c}) + c_{3}\ln(\text{P}) + c_{4}\ln(\text{R}^{\ast}) $
 
+<a href="https://www.codecogs.com/eqnedit.php?latex=\ln&space;(\eta)&space;\sim&space;c_{0}&space;&plus;&space;c_{1}\ln&space;\left(&space;\frac{\text{Re}_{c}}{\sqrt{ah(1-ad_{c})}}&space;\right)&space;&plus;&space;c_{2}\ln(ad_{c})&space;&plus;&space;c_{3}\ln(\text{P})&space;&plus;&space;c_{4}\ln(\text{R}^{\ast})" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\ln&space;(\eta)&space;\sim&space;c_{0}&space;&plus;&space;c_{1}\ln&space;\left(&space;\frac{\text{Re}_{c}}{\sqrt{ah(1-ad_{c})}}&space;\right)&space;&plus;&space;c_{2}\ln(ad_{c})&space;&plus;&space;c_{3}\ln(\text{P})&space;&plus;&space;c_{4}\ln(\text{R}^{\ast})" title="\ln (\eta) \sim c_{0} + c_{1}\ln \left( \frac{\text{Re}_{c}}{\sqrt{ah(1-ad_{c})}} \right) + c_{2}\ln(ad_{c}) + c_{3}\ln(\text{P}) + c_{4}\ln(\text{R}^{\ast})" /></a>
+
 This code calls the following variables: 
 
 | Variable | Symbol | Unit |
