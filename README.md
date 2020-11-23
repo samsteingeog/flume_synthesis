@@ -1,8 +1,8 @@
 # flume_synthesis: Repository for the Flume Synthesis Project
 
 ### A Functional Form for Particle Interception in Vegetated Environments 
-### Sam Stein, Laurel Larsen, and Jordan Wingenroth
-### Updated on: 11/1/2020
+### Sam Stein, Jordan Wingenroth, and Laurel Larsen
+### Updated on: 11/23/2020
 
 
 This repository contains code to fit the following formula (from Stein et al., *in prep*): 
