@@ -27,8 +27,8 @@ The repo contains the following files:
   + mudd_data.csv: data set to recreate Mudd et al., 2010 Figure 5 using our new functional form for particle capture
   + data_40.csv: data set of typical marsh flow and vegetation conditions w/ 40um sized particles 
   
-* /scripts:
-  + flume_model.Rmd: markdown file to fit the above eqn and integrate it into the model for marsh elevation change presented in Mudd et al., 2010. 
+
+* flume_synthesis_script.Rmd: markdown file to fit the above eqn and integrate it into the model for marsh elevation change presented in  Mudd et al., 2010. 
 
 References:
 
