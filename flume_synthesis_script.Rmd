@@ -1,0 +1,987 @@
+---
+title: "flume_synthesis"
+author: "Sam Stein"
+date: "11/20/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tibble)
+library(tidyverse)
+library(ggplot2)
+library(kableExtra)
+library(GGally)
+library(ggpubr)
+library(boot)
+library(kableExtra)
+library(Metrics)
+library(readxl)
+library(grDevices)
+library(pals)
+library(MASS)
+library(caret)
+library(moderndive)
+library(MuMIn)
+library(segmented)
+library(stats)
+library(pracma)
+library(metR)
+library(viridis)
+
+```
+
+# Data Import and Cleaning
+
+The following data sets are called in this markdown file:
+
+* data/flume_review_data.csv (training data to fit the model for particle capture)
+* data/muddtestdata.csv (data covering the same parameter range as Figure 5 from Mudd et al, 2010)
+* data/design_data_40.csv (data for typical marsh vegetation and flow conditions, with 40um diameter silt particles)
+
+```{r data import, include=TRUE, warning=FALSE}
+
+data <- read_csv("data/flume_review_data.csv") #training data 
+
+mudd_data <- read_csv("data/muddtestdata.csv") #Read in copy of data from Mudd et al 2010 Figure 5
+
+data_40 <- read_csv("data/design_data_40.csv") #Typical marsh parameter range, 40um particles
+
+```
+
+```{r data cleaning, include=TRUE, warning=FALSE}
+
+data <- data %>%
+  filter(!(is.na(eta))) %>% #only include runs with eta values
+  filter(c_density > 1) #Not including single collector studies
+  
+#Convert from character to numeric
+data$Re_c <- as.numeric(data$Re_c)
+data$height <- as.numeric(data$height)
+data$ave_velocity_cm <- as.numeric(data$ave_velocity_cm)
+  
+```
+
+```{r aggregate and log terms, include=TRUE, warning=FALSE}
+
+#Aggregate variables until each exponent has one associated variable
+
+#K value = drag-corrected Reynolds number (c1 term)
+
+findK <- function(Re, #Reynolds number
+                  a, #frontal area per unit volume
+                  h, #height of emergent veg (water height)
+                  d #collector diameter
+  
+){
+  
+  K <- Re/((a*h*(1-(a*d)))^(1/2))
+  
+  return(K)
+}
+
+#J value = TKE (c2 term) 
+
+findJ <- function(a, #frontal area per unit volume
+                  d #collector diameter
+){
+
+  J <- a*d
+
+  return(J)
+}
+
+#P value = ratio of particle density to water density (c3 term)
+
+findP <- function(part_dense, #particle density in g/cm^3
+                  fluid_dense #fluid density in g/cm^3
+){
+
+  P <- part_dense/fluid_dense
+
+  return(P)
+}
+
+
+#calculate aggregate terms
+
+data <- data %>%
+  mutate(K = findK(Re = Re_c, a = frontal_area_unit_volume, h = height, d = d_c)) %>%
+  mutate(J = findJ(a = frontal_area_unit_volume, d = d_c)) %>%
+  mutate(P = findP(part_dense = p_density, fluid_dense = f_density)) 
+
+#log terms for later linear model fit
+
+logdata <- data %>%
+  mutate(logX1 = log(K)) %>%
+  mutate(logX2 = log(J)) %>%
+  mutate(logX3 = log(P)) %>%
+  mutate(logX4 = log(radius_ratio)) %>%
+  mutate(logY = log(eta))
+
+```
+
+
+# Functional form for particle capture
+
+## Model fitting
+
+```{r fit linear model with caret, include=TRUE}
+#Write function to find linear fit
+ 
+control <- trainControl(method= "cv", number = 5) #this controls the settings for the model selection (5-fold cross validation currently)
+
+findLogFit2 <- function(logdata){
+
+  #Fit linear model to entire set
+  #input dataset MUST have these same variable names
+  
+  logY <- logdata$logY
+  logX1 <- logdata$logX1
+  logX2 <- logdata$logX2
+  logX3 <- logdata$logX3
+  logX4 <- logdata$logX4
+
+  linear_mod <- train(logY ~ logX1 + logX2 + logX3 + logX4, logdata, method = "lm", trControl = control) #fit using a linear model
+
+  return(linear_mod)
+
+}
+
+#Return linear model for entire dataset
+
+set.seed(12345) #setting seed for reproducibility 
+
+total_lm2 <- findLogFit2(logdata = logdata)
+
+total_lm2_final <- total_lm2$finalModel #extract final model
+
+trainall_R2 <- total_lm2$results$Rsquared #extract R2 for later bootstrapping
+all_coefs <- total_lm2$finalModel$coefficients #coefs for later comparison with boostrap results
+
+#Predict values for entire data set using new model
+logdata$predlogeta2 <- predict(total_lm2)
+
+
+```
+
+```{r stepwise regression}
+#Using a stepwise model selector based on AIC 
+#Input is the CV-fit linear model (w/ all parameters) derived above 
+
+#k - degrees of freedom for penalty (2 for true AIC); direction - both (try adding and substracting terms)
+AIC_final <- stepAIC(total_lm2_final, direction = "both", k = 2) 
+
+summary(AIC_final) #all terms were retained
+
+```
+
+```{r standardized coefs}
+#Finding standardized ("beta") coefs to compare influence of each term 
+
+#Pre-proccess data to center and scale (to find the standardized coefs)
+stanData <- data.frame("logX1" = logdata$logX1, 
+                       "logX2" = logdata$logX2,
+                       "logX3" = logdata$logX3,
+                       "logX4" = logdata$logX4, 
+                       "logY" = logdata$logY)
+
+stanData <- scale(stanData) %>%
+  data.frame()
+
+#Complete an OLS regression on the scaled data to find the beta coeficients 
+total_lm_stan <-  lm(data = stanData, logY ~ logX1 + logX2 + logX3 + logX4)
+standard_coefs <- total_lm_stan$coefficients
+
+#5 fold CV model
+
+stansub <- stanData %>% #creating subset of just logX1-4 for function below
+  dplyr::select(logX1, logX2, logX3, logX4)
+staneta <- stanData$logY #just logged eta values
+
+control <- trainControl(method = "cv", number = 5) #this controls the settings for the model selection (5-fold cross validation currently)
+
+stan_step <- train(x = stansub, 
+                   y = staneta, 
+                   method = "lm", #linear model version of function
+                   trControl = control) #using settings from above
+
+stan_step$results #Check results (final model should be smallest RMSE and highest R2)
+
+stancv_lm <- stan_step$finalModel #pull out final lm
+
+stan_all <- stancv_lm$coefficients #standardized coefficients 
+
+```
+
+
+
+## Comparison to other models
+```{r fit Palmer eqn}
+#Equation from Palmer et al 2014 
+
+Palmer <- function(Re, #Reynolds Number Re_c
+                   R #Effective radii ratio (d_p/d_c)
+){
+  eta <- (0.224*(Re**0.718)*(R**2.08))
+  logeta <- log(eta)
+  
+  return(logeta) #adjust to return either eta or ln(eta)
+}
+
+logdata$palmer <- Palmer(Re = logdata$Re_c, R = logdata$radius_ratio)
+
+#R2 values
+
+palmer_r2 <- cor(logdata$logY, logdata$palmer)**2  #0.000
+
+#Residuals
+
+palmer_rmse <- (mean((logdata$palmer-logdata$logY)**2))**(1/2) 
+```
+
+```{r fit Fauria eqn}
+#Equation from Fauria et al 2015
+#Fit from Re 50-500
+Fauria <- function(Re, #Reynolds Number Re_c
+                   R #Effective radii ratio (d_p/d_c)
+){
+  eta <- (2.06*(Re**-1.14)*(R**0.65))
+  logeta <- log(eta)
+  
+  return(logeta) #adjust to return either eta or ln(eta)
+}
+
+logdata$fauria <- Fauria(Re = logdata$Re_c, R = logdata$radius_ratio)
+
+#R2 values
+
+fauria_r2 <- cor(logdata$logY, logdata$fauria)**2  
+
+#Residuals
+
+fauria_rmse <- (mean((logdata$fauria-logdata$logY)**2))**(1/2) 
+```
+
+
+## Bootstrapping analysis
+
+Note: the bootstrap using the 5-fold CV can be very time intensive (on the scale of hours for a standard laptop). An alternative method without the CV can be used to save time (see commented out code in the bootFitR2Beta function). 
+```{r bootstrap R2, include=TRUE, fig.width=10}
+
+# Set up modified logfit function to return R2
+
+bootFitR2Beta <- function(data, indices){
+  
+  d <- data[indices,] # allows boot to select samples
+    
+  logY <- d$logY
+  logX1 <- d$logX1
+  logX2 <- d$logX2
+  logX3 <- d$logX3
+  logX4 <- d$logX4
+  
+  control <- trainControl(method= "cv", number = 5) #5 fold cross validation
+
+  fit <- train(logY ~ logX1 + logX2 + logX3 + logX4, data, method = "lm", trControl = control)
+  #fit <- lm(logY ~ logX1 + logX2 + logX3 + logX4, data = d) #alternate method using lm instead ov CV (to reduce processing time)
+ 
+  to_boot <- fit$results$Rsquared  #returns R2 in vector form
+  #to_boot <- summary(fit)$r.square #use for lm method
+  
+  return(to_boot)
+  
+}
+
+
+# Set seed
+set.seed(1234)
+
+# set up bootstrap to return R2 value using 10000 bootstraps
+
+bootR2Beta <- function(data){
+  
+  R2 <- boot(data = data, statistic = bootFitR2Beta, #Use statistic generated in previous function
+  R=10000) #10k reps
+  
+  return(R2)
+}
+
+#Get 95% confidence intervals of bootstrapped results
+
+trainboot_R2 <- bootR2Beta(data = logdata) 
+
+R2_ci <- boot.ci(trainboot_R2, conf = 0.95, type = "norm")
+R2_min <- R2_ci$normal[2]
+R2_max <- R2_ci$normal[3]
+
+```
+
+Note: the boot.ci function does not work neatly with the 5-fold crossvalidation when trying to return coefficients. The 95% confidence interval for the regression coefficients was based off of a standard linear model, but the fitted values from the 5-fold CV still fit within this range. The lm coefficients are also very close to the 5-fold CV coefficients. 
+
+```{r bootstrap coef, include=TRUE}
+#Set up modified logfit function to return coefficients
+
+bootFitCoef <- function(formula, logdata, indices){
+  
+  d <- logdata[indices,] # allows boot to select samples
+  
+  fit <- lm(formula, data=d)
+ 
+  return(coef(fit))  #returns ceofficients in vector form
+
+}
+
+bootCoef <- function(data){
+  
+  coef <- boot(data = data, statistic = bootFitCoef, #use the statistic set up in the previous function to bootstap sample
+               R=10000, formula = logY ~ logX1 + logX2 + logX3 + logX4) #10k reps, using simple lm formula
+   
+  return(coef)
+}
+
+
+#set seed
+set.seed(1234)
+
+coef <- bootCoef(data = logdata) #bootstrap and return coefs
+
+#all data
+#95% confidence interval of bootstraps
+all_int <- boot.ci(coef, conf = 0.95, type = "bca", index = 1) #intercept
+all_C1 <- boot.ci(coef, conf = 0.95, type = "bca", index = 2) #C1
+all_C2 <- boot.ci(coef, conf = 0.95, type = "bca", index = 3) #C2
+all_C3 <- boot.ci(coef, conf = 0.95, type = "bca", index = 4) #C3
+all_C4 <- boot.ci(coef, conf = 0.95, type = "bca", index = 5) #C4
+
+#Extract CI values 
+all_int <- all_int$bca[4:5] #4 = min, 5 = max
+all_C1 <- all_C1$bca[4:5]
+all_C2 <- all_C2$bca[4:5]
+all_C3 <- all_C3$bca[4:5]
+all_C4 <- all_C4$bca[4:5]
+
+all_CI <- rbind(all_int, all_C1, all_C2, all_C3, all_C4)
+all_CI <- as.data.frame(all_CI)
+
+#Vectors of min and max coefs
+min_all <- all_CI$V1
+max_all <- all_CI$V2
+
+# Table with 95% CI min/max results, fitted model, standard coefs
+table_all_fit <- rbind(min_all, all_coefs, max_all, stan_all) 
+table_all_fit <- as.data.frame(table_all_fit) 
+colnames(table_all_fit) <- c("Intercept", "C1", "C2", "C3", "C4")
+row.names(table_all_fit) <- c("Min", "Fit", "Max", "Standard")
+
+table_all_fit #View table
+
+```
+
+# Integration in sedimentation models
+
+```{r predict eta function}
+#write function to clean data and return predicted eta values from flume synthesis model
+predEta <- function(data, #dataset (variable names must match those in function) 
+                    model #fitted model
+                    ){
+ 
+  data <- data %>%
+  filter(!(is.na(run_ID))) #only include observations with data in them
+
+  #Convert from character to numeric
+  data$Re_c <- as.numeric(data$Re_c)
+  data$height <- as.numeric(data$height)
+  data$ave_velocity <- as.numeric(data$ave_velocity)
+
+  #Calculate aggregate terms (see flumemodel.Rmd for more details on functions)
+  data <- data %>%
+    mutate(K = findK(Re = Re_c, a = frontal_area_unit_volume, h = height, d = d_c)) %>%
+    mutate(J = findJ(a = frontal_area_unit_volume, d = d_c)) 
+
+  #log terms for later linear model fit
+
+  data <- data %>%
+    mutate(logX1 = log(K)) %>%
+    mutate(logX2 = log(J)) %>%
+    mutate(logX3 = log(p_density/f_density)) %>%
+    mutate(logX4 = log(radius_ratio)) 
+  
+  #return log(eta) predictions
+  
+  data$predlogeta <- predict(object = model, newdata = data) 
+
+  #convert back from log(eta) to eta
+
+  data$predeta <- exp(data$predlogeta)
+  
+  return(data)
+   
+}
+
+
+#Recreation of Mudd data set
+mudd_data <- predEta(data = mudd_data, model = AIC_final)
+
+#Typical marsh parameters, 40um particles
+data_40 <- predEta(data = data_40, model = AIC_final)
+
+```
+
+```{r setup environmental conditions CM, include=TRUE, warning=FALSE}
+
+#set erosion rate 
+E <- 0 #m/sec
+#Assumed to be zero in vegetated environments based on D'alpaos et al 2007
+#Set compaction rate
+Cmp <- 0 #m/sec
+#Assuming zero across sub-annual to annual time scale
+
+#set collectors per area and density
+setCond <- function(data){
+  data$C <- 25 * (1000000) #g/m^3 SSC
+  data$area <- 1*1 #m test area
+  data$n_c <- data$c_density/data$area # number of collecters/m^2
+  data$rho_w <- data$f_density * (1000000) #density of fluid (g/m^3)
+  data$rho_p <- data$p_density * (1000000) #density of particle (g/m^3)
+  
+  return(data)
+}
+
+#Set environmental conditions for data sets
+
+mudd_data <- setCond(mudd_data)
+
+data_40 <- setCond(data_40)
+
+```
+
+```{r particle capture sedimentation, include=TRUE, warning=FALSE}
+
+#Set up function for eqn #4 from Mudd et al 2010
+#mass captured = eta * C * velocity * collector diameter * # collectors/area * height 
+
+#converting from cm to m to keep consistent with Qs formula below
+
+findQc <- function(data){
+  
+  C <- data$C #concentration in g/m^3
+  eta <- data$predeta #use this for normal predicted eta
+  u <- data$ave_velocity * (1/100)  #velocity in m/sec
+  d_c <- data$d_c * (1/100) #diameter of collector in m
+  n_c <- data$n_c #number of collectors per unit test area
+  h <-data$height * (1/100) #submerged height of collector in m
+
+  #calculate mass collected over area and time (mg/cm2sec)
+  data$Qc <- eta*C*u*d_c*n_c*h 
+  
+  return(data)
+}
+
+#Find Qc
+
+mudd_data <- findQc(mudd_data)
+
+data_40 <- findQc(data_40)
+
+```
+
+```{r settling equation mudd data, include=TRUE, warning=FALSE}
+
+#Working from eqns 9-17 from Mudd et al 2010
+#the value from alpha_k from Nepf 1999 is unit dependent, so values in this function are converted from cm to m
+
+#effective settling velocity = settline velocity - upward motion from turbulence 
+
+findQs <- function(data){
+ 
+  #settling conditions and empirical constants
+
+  A <- 38.0 #from Camenen 2007 for silt (see Mudd table 1)  (dimensionless coefs based on particle material/shape)
+  B <- 3.55 #from Camenen 2007 for silt (see Mudd table 1; called F in Mudd and B in original paper)  
+  m <- 1.12 #from Camenen 2007 for silt (see Mudd table 1)  
+  g <-   9.80665  #acceleration due to gravity (m/sec^2)
+  K_vk <- 0.4 #von Karman constant, assumed
+  alpha_k <- 0.9 #from Nepf 1999
+  alpha_0 <- 11 #from Tanino and Nepf 2008 (see Mudd table 1)
+  area <- data$area 
+  C <- data$C  
+  
+  #set up variables
+  s <-  data$p_density/data$f_density  #ratio of particle - water density
+  d_p <- data$d_p_cm * (1/100) #particle diameter (m)
+  v <- data$kin_viscosity_cm2 * (1/(100 * 100))  #kinematic viscosity (m^2/sec)
+  a <- data$frontal_area_unit_volume * (100/1) #frontal area/unit volume (cm^-1)  
+  c_dense <- data$c_density #number of collectors
+  Re <- data$Re_c #Reynolds number
+  d_c <- data$d_c * (1/100)
+  n_c <- data$n_c #number of collectors/m^2
+  u <- data$ave_velocity * (1/100) #velocity in m/sec
+  rho_w <- data$rho_w #* (1/(100*100*100)) #density of fluid (kg/m^3)
+  
+  
+  #NOTE: we used two different eqns for drag coefficient for each data data. 
+  
+  #For the mudd_data dataset, we use the following, with different empirical coefs for each site. 
+  
+  if(d_c > 0.5) {     #based on empircal equation for biomass, each site has different average collector diameters
+  #Drag coefficient terms for oyster low marsh
+  biomass <- data$biomass_gm2 #biomass from fig 3 equations in g/m2
+  muO <- 0.0019
+  beta_phi_betaO <- biomass**(0.18+0.53)
+  bigX <- 0.46
+  zeta <- 3.8 
+  alphaO <- 0.12
+  beta_phiO <- biomass**(0.18)
+  
+  #eqn 17 mudd: drag coefficient (C_D) 
+  termaO <- (alpha_0*v)/(u*muO*beta_phiO)
+  termcO <- zeta*beta_phi_betaO*((alphaO*muO*3.14)/4)
+  C_D <- 2*(termaO+bigX+termcO)
+  }
+  
+  else {
+  #Drag coefficient terms for goat high marsh
+  biomass <- data$biomass_gm2 #biomass from fig 3 equations in g/m2
+  muG <- 0.00066
+  beta_phi_betaG <- biomass**(0.29+0.40)
+  bigX <- 0.46
+  zeta <- 3.8 
+  alphaG <- 0.55
+  beta_phiG <- biomass**(0.40)
+  
+  #eqn 17 mudd: drag coefficient (C_D) 
+  termaG <- (alpha_0*v)/(u*muG*beta_phiG)
+  termcG <- zeta*beta_phi_betaG*((alphaG*muG*3.14)/4)
+  C_D <- 2*(termaG+bigX+termcG)
+  }
+  
+  #Everything else is the same for all data sets from this point on in the function
+  
+  #eqn 15: turbulent energy per unit mass of water (k) 
+
+  k = (alpha_k**2)*(u**2)*((C_D*a*d_c)**(2/3))
+
+  #eqn 10: settling velocity in turbulence free water (from Mudd 2010)
+
+  term1 <- v/d_p
+  term2 <- ((A/B)**(2/m))/4
+  term3top <- 4*(d_p**3)*g*(s-1)
+  term3bot <-3*B*(v**2)
+  term3 <- (term3top/term3bot)**(1/m)
+  term4 <- ((A/B)**(1/m))/2
+
+  w_s <- term1*((term2+term3)**(1/2)-term4)**m
+  
+  #eqn 14: calculate shear velocity (u*)
+  
+  u_star = ((0.2 * k)/rho_w)**(1/2)
+  
+  #eqn 11: upward velocity 
+
+  w_up = K_vk*u_star 
+
+  #eqn 9: mass settled = effective settling velocity * C
+  w_eff = w_s - w_up  #effecitve settling velocity = settling with no turbulence - upward motion from turbulence 
+  
+  data$k <- k
+  
+  data$C_D <- C_D
+  
+  data$ustar <- u_star
+  
+  data$ws <- w_s 
+  
+  data$wup <- w_up 
+
+  data$weff <- w_eff
+  
+  data$Qs <- w_eff * C
+  
+  return(data)
+}
+
+mudd_data <- findQs(mudd_data)
+
+
+```
+
+```{r settling equation non mudd, include=TRUE, warning=FALSE}
+
+#Working from eqns 9-17 from Mudd et al 2010
+#the value from alpha_k from Nepf 1999 is unit dependent, so values in this function are converted from cm to m
+
+#effective settling velocity = settline velocity - upward motion from turbulence 
+
+findQs <- function(data){
+ 
+  #settling conditions and empirical constants
+
+  A <- 38.0 #from Camenen 2007 for silt (see Mudd table 1)  (dimensionless coefs based on particle material/shape)
+  B <- 3.55 #from Camenen 2007 for silt (see Mudd table 1; called F in Mudd and B in original paper)  
+  m <- 1.12 #from Camenen 2007 for silt (see Mudd table 1)  
+  g <-   9.80665  #acceleration due to gravity (m/sec^2)
+  K_vk <- 0.4 #von Karman constant, assumed
+  alpha_k <- 0.9 #from Nepf 1999
+  alpha_0 <- 11 #from Tanino and Nepf 2008 (see Mudd table 1)
+  area <- data$area 
+  C <- data$C  
+  
+  #set up variables
+  s <-  data$p_density/data$f_density  #ratio of particle - water density
+  d_p <- data$d_p_cm * (1/100) #particle diameter (m)
+  v <- data$kin_viscosity_cm2 * (1/(100 * 100))  #kinematic viscosity (m^2/sec)
+  a <- data$frontal_area_unit_volume * (100/1) #frontal area/unit volume (cm^-1)  
+  c_dense <- data$c_density #number of collectors
+  Re <- data$Re_c #Reynolds number
+  d_c <- data$d_c * (1/100)
+  n_c <- data$n_c #number of collectors/m^2
+  u <- data$ave_velocity * (1/100) #velocity in m/sec
+  rho_w <- data$rho_w #* (1/(100*100*100)) #density of fluid (kg/m^3)
+  
+  #NOTE: we used two different eqns for drag coefficient for each data data. 
+  
+  #For the data_40 dataset we use....
+  
+  #eqn 16: drag coefficient (C_D) 
+  num = c_dense / area #number of collectors per area
+
+  phi = (num * pi * (d_c)^2)/4  #solid volume fraction (from Tanino and Nepf 2008)
+
+  alpha_1 = 0.46 + (3.8 * phi) # (eqn 13 from Tanino and Nepf 2008)
+
+  C_D = 2*((alpha_0/Re)+alpha_1) #eqn 16 Mudd
+  
+  #Everything else is the same for all data sets from this point on in the function
+  
+  #eqn 15: turbulent energy per unit mass of water (k) 
+
+  k = (alpha_k**2)*(u**2)*((C_D*a*d_c)**(2/3))
+
+  #eqn 10: settling velocity in turbulence free water (from Mudd 2010)
+
+  term1 <- v/d_p
+  term2 <- ((A/B)**(2/m))/4
+  term3top <- 4*(d_p**3)*g*(s-1)
+  term3bot <-3*B*(v**2)
+  term3 <- (term3top/term3bot)**(1/m)
+  term4 <- ((A/B)**(1/m))/2
+
+  w_s <- term1*((term2+term3)**(1/2)-term4)**m
+  
+  #eqn 14: calculate shear velocity (u*)
+  
+  u_star = ((0.2 * k)/rho_w)**(1/2)
+  
+  #eqn 11: upward velocity 
+
+  w_up = K_vk*u_star 
+
+  #eqn 9: mass settled = effective settling velocity * C
+  w_eff = w_s - w_up  #effecitve settling velocity = settling with no turbulence - upward motion from turbulence 
+
+  data$phi <- phi
+  
+  data$k <- k
+  
+  data$C_D <- C_D
+  
+  data$ustar <- u_star
+  
+  data$ws <- w_s 
+  
+  data$wup <- w_up 
+
+  data$weff <- w_eff
+  
+  data$Qs <- w_eff * C
+  
+  return(data)
+}
+
+
+data_40 <- findQs(data_40)
+
+```
+
+```{r O}
+#Find organic accretion rate (ie from plant root growth + vegetation detritus on the substrate)
+
+rho_o <- 1.14 * 1000000 #g/m3 from Callaway et atl 1997, density of organic matter in marsh soils
+
+#From Swanson et al 2013
+
+above <- 0.00238 * 100000000/1000 #g/m4year mean value for above ground biomass given in Table 4, based on simulation run using China Camp parameters
+below <- 0.00417 * 100000000/1000 #g/m4year mean value for below ground biomass given in Table 4
+
+M_o <- (above + below) / (1000*365*24*60*60) #rate of above and below ground biomass, then converting from mg/cm4year to g/cm4sec
+
+O <- M_o/rho_o #divide by density of organic material in sediment to get cm/sec
+
+#This value is tiny compared to Qc and Qs, so its been disregarded most of our analysis 
+
+```
+
+```{r Elevation change functions, include=TRUE, warning=FALSE}
+
+
+findElevation <- function(data){
+  
+  data$dzdt <- (data$Qc/data$rho_p) + (data$Qs/data$rho_p) + O - E - Cmp #total instantaneous elevation change, from Mudd et al 2010
+  
+  data$QcQs <- data$Qc + data$Qs #sedimentation from capture and settling
+  
+  data$perQc <- data$Qc/(data$Qc+data$Qs) #percentange of sedimentation from capture
+  
+  return(data)
+}
+
+
+mudd_data <- findElevation(mudd_data)
+
+data_40 <- findElevation(data_40)
+
+```
+
+```{r }
+
+
+```
+
+
+# Creating figures
+
+## Functional form
+
+```{r setup eqn for plots, include=TRUE, eval=FALSE}
+
+#Only purpose of this function is to include R2 values within the plot fields later on in this code
+#To simplify the code and decrease run time, this function returns the R2 from a simple OLS. These values are very close to the R2 from the 5-fold CV (within 0.01) for all plots included in this script. 
+
+lm_eqn <- function(data){
+    m <- lm(data$logY ~ data$logX1 + data$logX2 + data$logX3 + data$logX4)
+    eq <- substitute(~~italic(r)^2~"="~r2, 
+         list(r2 = format(summary(m)$r.squared, digits = 3)))
+    as.character(as.expression(eq));
+}
+
+```
+
+```{r check linear function fit 2, include=TRUE, fig.width= 4}
+
+#Text for plots
+xlablog = expression(paste("observed ln(", eta, ")"))
+ylablog = expression(paste("predicted ln(",  eta, ")"))
+Retext = expression(paste("Re"[c]))
+R2text = expression(paste("R"^2, "= 0.817"))
+
+#log-log plot of observed and predicted eta
+all2 <- ggplot(logdata, aes(x = logY, y = predlogeta2)) + 
+  geom_smooth(method = "lm", color = "black") +
+  geom_point(shape = 19, size = 5, alpha = .8, aes(color = Re_c)) +
+  theme_pubclean() + 
+  theme(legend.position = "right") + 
+  labs(y = ylablog, x = xlablog) +
+  geom_text(x = -8, y = -5, label = R2text, parse = TRUE, size = 5) +
+  scale_color_viridis_c(option = "C", direction = 1, name = Retext)
+
+ggsave(file = "graphics/all2.png", plot = all2)
+
+#Plot to compare other eta models
+gather_a <- logdata %>%
+  dplyr::select(c(Re_c, logY, predlogeta2)) %>% #just the pertinent variables
+  mutate(author = "This paper") %>% #set author name to label on plot later
+  mutate(predlogeta2 = as.numeric(predlogeta2)) #change from named numeric to numeric
+
+gather_b <- logdata %>%
+  dplyr::select(c(Re_c, logY, palmer)) %>%
+  rename(predlogeta2 = palmer) %>% #change variable name to match for later rbind
+  mutate(author = "Palmer") %>%
+  mutate(predlogeta2 = as.numeric(predlogeta2))
+
+gather_c <- logdata %>%
+  dplyr::select(c(Re_c, logY, fauria)) %>%
+  rename(predlogeta2 = fauria) %>%
+  mutate(author = "Fauria") %>%
+  mutate(predlogeta2 = as.numeric(predlogeta2))
+
+gather_data <- rbind(gather_a, gather_b, gather_c) #put into same dataframe
+
+#plot data
+
+comp1plot <- ggplot(gather_data) + geom_point(aes(y = predlogeta2, x = logY, color = Re_c, shape = author), size = 6, alpha = 0.6) +
+  labs(x = xlablog, y = ylablog) +
+  lims(x = c(-12, 0)) +
+ # lims(y = c(0, 0.045), x = c(0,0.045)) +
+  theme_pubclean() +
+  scale_color_viridis_c(option = "plasma", direction = 1, name = Retext)
+
+ggsave(filename = "graphics/all_eqn_log.png", plot = comp1plot)
+
+```
+
+## Sedimentation model
+
+```{r original mudd figure data}
+
+#set up expressions
+xtext <- expression(paste("flow velocity (",paste(italic("u"))," in m/sec)"))
+ytext <- expression(paste("particle  diameter (", "d"["p"] ~ "in " , paste(mu), "m)"))
+
+goatsub <- expression(paste("Goat Island high marsh, ", italic(h), " = 0.1 m, ", italic(B), "= 1000 g/", m^2))
+oystersub <- expression(paste("Oyster Landing low marsh, ", italic(h), " = 0.1 m, ", italic(B), "= 1000 g/", m^2))
+
+####Recreate Mudd 2010 Fig 5 using original Palmer eqn
+
+PalmerEta <- function(data){
+  
+  Re <- data$Re_c #Reynolds Number Re_c
+  R <- data$radius_ratio#Effective radii ratio (d_p/d_c)
+  
+  data$predeta <- (0.224*(Re**0.718)*(R**2.08)) #eqn for eta based on Palmer et al 2004
+
+  return(data) #return eta predicted with Palmer eqn
+}
+
+#Run new eta values through same set of equations as above into new data set
+mudd_data_og <- PalmerEta(mudd_data)
+mudd_data_og <- setCond(mudd_data_og)
+mudd_data_og <- findQc(mudd_data_og)
+mudd_data_og <- findQs(mudd_data_og)
+mudd_data_og <- findElevation(mudd_data_og)
+
+#Create new columns with units matching the original figure
+
+mudd_data_og$d_p_um <- mudd_data_og$d_p_cm * 10000
+
+mudd_data_og$velocity_m <- mudd_data_og$ave_velocity / 100
+
+#isolate test sites
+
+goat_og <- mudd_data_og %>%
+  filter(d_c < 0.49 & p_density == 2.65)
+
+oyster_og <- mudd_data_og %>%
+  filter(d_c > 0.64 & p_density == 2.65) 
+
+#Plot
+
+giplot_og <- ggplot(goat_og, aes(x = velocity_m, y = d_p_um, z = perQc)) + 
+  geom_contour(aes(color = ..level..), bins = 25) +
+  geom_label_contour(skip = 1, rotate = FALSE) +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        plot.subtitle = element_text(hjust = 1), 
+        panel.border = element_rect(colour = "black", fill=NA, size=2), 
+        legend.position = "right") +
+  labs(subtitle = goatsub,  
+       y = ytext, x = xtext) + 
+  scale_color_viridis_c(name = "Sedimentation due to capture",direction = 1, option = "D")  #limits = c(0.0, .75), breaks = c(.0, 0.4, 0.75),
+
+
+olplot_og <- ggplot(oyster_og, aes(x = velocity_m, y = d_p_um, z = perQc)) + 
+  geom_contour(aes(color = ..level..), bins = 25) +
+  geom_label_contour(skip = 1, rotate = FALSE) +
+  theme_classic() + 
+  theme(plot.subtitle = element_text(hjust = 1), 
+        panel.border = element_rect(colour = "black", fill=NA, size=2), 
+        legend.position = "right") +
+  labs(subtitle = oystersub, 
+       y = ytext, x = xtext) + 
+  scale_color_viridis_c(name = "Sedimentation due to capture (%)",direction = 1, option = "D") #limits = c(0.0, .75), breaks = c(0.0, 0.4, 0.75),
+
+mudd_plot_old<- ggarrange(giplot_og, olplot_og, ncol = 1, common.legend = TRUE)
+
+ggsave(file = "graphics/muddorig.png", plot = mudd_plot_old)
+
+####Recreate the Mudd 2010 Figure 5 using our formula for eta (instead of original Palmer 2004 eqn)
+
+#Create new columns with units matching the original figure
+
+mudd_data$d_p_um <- mudd_data$d_p_cm * 10000
+
+mudd_data$velocity_m <- mudd_data$ave_velocity / 100
+
+#isolate test sites
+
+goat <- mudd_data %>%
+  filter(d_c < 0.49 & p_density == 2.65)
+
+oyster <- mudd_data %>%
+  filter(d_c > 0.64 & p_density == 2.65) 
+
+#Plot
+
+giplot <- ggplot(goat, aes(x = velocity_m, y = d_p_um, z = perQc)) + 
+  geom_contour(aes(color = ..level..), bins = 25) +
+  geom_label_contour(skip = 1, rotate = FALSE) +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        plot.subtitle = element_text(hjust = 1), 
+        panel.border = element_rect(colour = "black", fill=NA, size=2), 
+        legend.position = "right") +
+  labs(subtitle = goatsub,  
+       y = ytext, x = xtext) + 
+  scale_color_viridis_c(name = "Sedimentation due to capture", limits = c(.0, .16), breaks = c(.0, 0.08, 0.15), direction = 1, option = "D")  
+
+
+olplot <- ggplot(oyster, aes(x = velocity_m, y = d_p_um, z = perQc)) + 
+  geom_contour(aes(color = ..level..), bins = 25) +
+  geom_label_contour(skip = 1, rotate = FALSE) +
+  theme_classic() + 
+  theme(plot.subtitle = element_text(hjust = 1), 
+        panel.border = element_rect(colour = "black", fill=NA, size=2), 
+        legend.position = "right") +
+  labs(subtitle = oystersub, 
+       y = ytext, x = xtext) + 
+  scale_color_viridis_c(name = "Sedimentation due to capture (%)", limits = c(0.0, .16), breaks = c(0.0, 0.08, 0.15), direction = 1, option = "D") 
+
+mudd_plot<- ggarrange(giplot, olplot, ncol = 1, common.legend = TRUE)
+
+ggsave(file = "graphics/muddnew.png", plot = mudd_plot)
+
+```
+```{r typical march sed fig}
+#Plotting the sedimentation from capture, settling, and total for 40um silt particles
+
+#axes and legend text for later
+
+xtext <- expression(paste("        flow velocity (",paste(italic("u"))," in cm/sec)"))
+ytext <- expression(paste("frontal area/unit volume  (", paste(italic(   a))," in ", paste("cm"^"-1"), ")"))
+sedtext <- expression(paste("Sedimentation (g",m^-2,sec^-1,")    "))
+
+a40_tile <- ggplot(data_40, aes(x = ave_velocity, y = frontal_area_unit_volume, fill = Qc)) +  #Capture
+  geom_tile() +
+  theme_pubclean() + 
+  theme(axis.title.x = element_blank()) +
+  labs(y = "") +
+  scale_fill_viridis(name = sedtext, limits = c(4000,56000), direction = 1, option = "C", breaks = c(4000,56000)) 
+
+b40_tile <- ggplot(data_40, aes(x = ave_velocity, y = frontal_area_unit_volume, fill = Qs)) +  #Settling
+  geom_tile() +
+  theme_pubclean() + 
+  theme(axis.title.x = element_blank()) +
+  labs(y = "") +
+  scale_fill_viridis(name = sedtext, limits = c(4000,56000), direction = 1, option = "C", breaks = c(4000,56000))  
+
+c40_tile <- ggplot(data_40, aes(x = ave_velocity, y = frontal_area_unit_volume, fill = QcQs)) +  #Total
+  geom_tile() +
+  theme_pubclean() + 
+  theme(axis.title.x = element_blank()) +
+  labs(y = "") +
+  scale_fill_viridis(name = sedtext, limits = c(4000,56000), direction = 1, option = "C", breaks = c(4000,56000)) 
+
+plot40_tile <- ggarrange(a40_tile, b40_tile, c40_tile, ncol = 1, common.legend = TRUE, legend = "top")
+    
+fig40_tile <- ggpar(plot40_tile, family = "arial") #This allows the annotation in the next line
+
+annfig40_tile <- annotate_figure(fig40_tile, top = text_grob(""), left = text_grob(ytext, rot=90), bottom = text_grob(xtext), 
+                            right = text_grob("Capture                             Settling                              Total", rot = 270))
+
+ggsave(file = "graphics/40um_sediment.png", plot = annfig40_tile)
+
+
+```
+
+```
