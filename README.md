@@ -2,7 +2,7 @@
 
 ### A Functional Form for Particle Interception in Vegetated Environments 
 ### Sam Stein, Jordan Wingenroth, and Laurel Larsen
-### Updated on: 11/23/2020
+### Updated on: 08/29/2023
 
 
 This repository contains code to fit the following formula (from Stein et al., 2021): 
