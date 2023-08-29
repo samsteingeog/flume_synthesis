@@ -5,7 +5,7 @@
 ### Updated on: 11/23/2020
 
 
-This repository contains code to fit the following formula (from Stein et al., *in prep*): 
+This repository contains code to fit the following formula (from Stein et al., 2021): 
 <a href="https://www.codecogs.com/eqnedit.php?latex=\ln&space;(\eta)&space;\sim&space;c_{0}&space;&plus;&space;c_{1}\ln&space;\left(&space;\frac{\text{Re}_{c}}{\sqrt{ah(1-ad_{c})}}&space;\right)&space;&plus;&space;c_{2}\ln(ad_{c})&space;&plus;&space;c_{3}\ln(\text{P})&space;&plus;&space;c_{4}\ln(\text{R}^{\ast})" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\ln&space;(\eta)&space;\sim&space;c_{0}&space;&plus;&space;c_{1}\ln&space;\left(&space;\frac{\text{Re}_{c}}{\sqrt{ah(1-ad_{c})}}&space;\right)&space;&plus;&space;c_{2}\ln(ad_{c})&space;&plus;&space;c_{3}\ln(\text{P})&space;&plus;&space;c_{4}\ln(\text{R}^{\ast})" title="\ln (\eta) \sim c_{0} + c_{1}\ln \left( \frac{\text{Re}_{c}}{\sqrt{ah(1-ad_{c})}} \right) + c_{2}\ln(ad_{c}) + c_{3}\ln(\text{P}) + c_{4}\ln(\text{R}^{\ast})" /></a>
 
 which calls the following variables: 
@@ -33,3 +33,5 @@ The repo contains the following files:
 References:
 
 Mudd, S.M.;  D’Alpaos, A.;  Morris, J.T.   How does vegetation affect sedimentation on tidal marshes? Investigating particle capture and hydrodynamic controls on biologically mediated sedimentation. *Journal of Geophysical Research: Earth Surface* 2010, *115*, 1–14.  doi:10.1029/2009JF001566.
+
+Stein, S., Wingenroth, J., & Larsen, L. (2021). A functional form for fine sediment interception in vegetated environments. Geosciences (Switzerland), 11(4).  doi:10.3390/geosciences11040157
